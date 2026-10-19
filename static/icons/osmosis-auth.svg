@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs><linearGradient id="t" x1=".15" y1="0" x2=".85" y2="1"><stop offset="0" stop-color="#26303d"/><stop offset="1" stop-color="#10161f"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14" fill="url(#t)"/>
+  <!-- A padlock: the login wall in front of every app. -->
+  <path d="M24 30 v-6 a8 8 0 0 1 16 0 v6" fill="none" stroke="#C9D6E8" stroke-width="5"/>
+  <rect x="18" y="29" width="28" height="22" rx="5" fill="#C9D6E8"/>
+  <rect x="30" y="35" width="4" height="9" rx="2" fill="#10161f"/>
+</svg>

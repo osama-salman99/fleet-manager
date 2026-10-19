@@ -1,0 +1,9 @@
+<!--
+  Health's logo (a heartbeat line), flat in its own colour on a dark tile of the same hue: the browser-tab
+  version. The home-screen icons are the same logo drawn as lit glass on that tile.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs><linearGradient id="t" x1=".15" y1="0" x2=".85" y2="1"><stop offset="0" stop-color="#103222"/><stop offset="1" stop-color="#03170f"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14" fill="url(#t)"/>
+  <g transform="translate(32 32) scale(.74) translate(-50 -50)" fill="#7BF3B2" color="#7BF3B2"><path d="M19 52H35L43 29L55 73L62 52H81" fill="none" stroke="currentColor" stroke-width="8.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+</svg>

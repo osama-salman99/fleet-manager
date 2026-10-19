@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1411" media="(prefers-color-scheme: dark)">
+<title>Hetzner – Health</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<script src="/spa.js"></script>
+<script src="/dom.js"></script>
+<script src="/nav.js"></script>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2129; --line:#30363d; --line-soft:#21262d;
+    --ink:#e6edf3; --soft:#c9d1d9; --faint:#8b949e;
+    --blue:#58a6ff; --green:#3fb950; --amber:#d29922; --red:#f85149; --pink:#f778ba; --cyan:#39c5cf;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:22px 18px 60px; max-width:1120px; margin-inline:auto;
+  }
+  a { color:inherit; }
+  .top { display:flex; align-items:center; gap:12px; margin-bottom:4px; }
+  .back {
+    font-size:.8rem; text-decoration:none; color:var(--faint);
+    border:1px solid var(--line); border-radius:7px; padding:4px 10px; white-space:nowrap;
+  }
+  @media (hover: hover) and (pointer: fine) {
+      .back:hover { border-color:var(--faint); color:var(--ink); }
+  }
+  .back:active { border-color:var(--faint); color:var(--ink); transition-duration: 60ms; }
+  h1 { font-size:1.15rem; margin:0; font-weight:650; flex:1; }
+  h1 .dot { color:var(--pink); }
+  .sub { color:var(--faint); font-size:.8rem; margin:2px 0 20px; }
+  h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); font-weight:650; margin:26px 0 11px; }
+
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .kpi .n { font-size:1.5rem; font-weight:680; font-variant-numeric:tabular-nums; }
+  .kpi .l { color:var(--faint); font-size:.76rem; margin-top:2px; }
+  /* The cost is a sum over the replies we still hold, not an all-time figure, so
+     the card carries its own start date — three short words on the card beat a
+     sentence underneath it, which nobody reads. The full window is in the
+     card's tooltip. */
+  .kpi .since { color:var(--faint); opacity:.75; font-size:.7rem; margin-top:3px; }
+
+  /* Recent replies gained two columns (which session, and at what effort), so on
+     a phone the table now scrolls sideways. Source is "main" on nearly every row
+     — hide that one column at phone width so the figures people actually read
+     stay on screen. */
+  @media (max-width:560px) {
+    table.rt tr > *:nth-child(5) { display:none; }
+    table.rt th, table.rt td { padding-left:8px; padding-right:8px; }
+  }
+
+  /* Time per request: these card titles are sentences, not bucket names. On a
+     phone the table keeps when, which session, replies and the total. */
+  .bk.rq .name { text-transform:none; }
+  @media (max-width:560px) {
+    table.rq tr > *:nth-child(3), table.rq tr > *:nth-child(5) { display:none; }
+    table.rq th, table.rq td { padding-left:8px; padding-right:8px; }
+    table.rs tr > *:nth-child(2), table.rs tr > *:nth-child(3) { display:none; }
+    table.rs th, table.rs td { padding-left:8px; padding-right:8px; }
+  }
+
+  .buckets { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }
+  .bk { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 15px; }
+  .bk .h { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:9px; }
+  .bk .name { font-weight:680; font-size:.95rem; text-transform:capitalize; }
+  .bk .rng { color:var(--faint); font-size:.72rem; }
+  .bk .big { font-size:2rem; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; }
+  .bk .big small { font-size:.9rem; color:var(--faint); font-weight:600; }
+  .bar { height:7px; background:var(--line-soft); border-radius:4px; overflow:hidden; margin:11px 0 9px; }
+  .bar i { display:block; height:100%; background:var(--blue); border-radius:4px; transition:width .5s ease; }
+  .bk .pp { display:flex; flex-wrap:wrap; gap:8px 15px; color:var(--faint); font-size:.76rem; }
+  .bk .pp b { color:var(--soft); font-variant-numeric:tabular-nums; }
+
+  .windows { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; }
+  .win { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 15px; }
+  .win .h { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+  .win .lab { font-weight:680; font-size:.95rem; }
+  .win .lab small { color:var(--faint); font-weight:600; font-size:.72rem; margin-left:6px; }
+  .win .big { font-size:1.9rem; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; }
+  .win .big small { font-size:.85rem; color:var(--faint); font-weight:600; }
+  .win .brk { display:flex; gap:14px; color:var(--faint); font-size:.76rem; margin-top:11px; flex-wrap:wrap; }
+  .win .brk b { color:var(--soft); font-variant-numeric:tabular-nums; }
+  .win .pbar { height:8px; background:var(--line-soft); border-radius:5px; overflow:hidden; margin:12px 0 7px; }
+  .win .pbar i { display:block; height:100%; border-radius:5px; transition:width .5s ease,background .3s ease; }
+  .win .pbar i.g { background:var(--green); }
+  .win .pbar i.y { background:var(--amber); }
+  .win .pbar i.r { background:var(--red); }
+  .win .spent { display:flex; justify-content:space-between; gap:10px; font-size:.78rem; color:var(--faint); }
+  .win .spent b { color:var(--ink); font-variant-numeric:tabular-nums; }
+  .win .lab { display:inline-flex; align-items:center; }
+  .lpill { font-size:.64rem; text-transform:uppercase; letter-spacing:.05em; padding:2px 8px; border-radius:20px; font-weight:700; white-space:nowrap; }
+  .lpill.ok { background:rgba(63,185,80,.15); color:var(--green); }
+  .lpill.warning { background:rgba(210,153,34,.16); color:var(--amber); }
+  .lpill.rejected { background:rgba(248,81,73,.16); color:var(--red); }
+  .badge { font-size:.6rem; text-transform:uppercase; letter-spacing:.05em; color:var(--faint);
+           border:1px solid var(--line); border-radius:20px; padding:1px 7px; margin-left:7px; font-weight:600; }
+  .note code { font-family:var(--mono); font-size:.9em; background:var(--panel2); padding:1px 4px; border-radius:4px; }
+  .note { color:var(--faint); font-size:.74rem; margin:9px 2px 0; line-height:1.55; }
+
+  table { width:100%; border-collapse:collapse; font-size:.83rem; }
+  .wrap { overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; }
+  th { text-align:left; color:var(--faint); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
+       padding:9px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td { padding:8px 12px; border-bottom:1px solid var(--line-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  tr:last-child td { border-bottom:none; }
+  td.model, td.tool { font-family:var(--mono); font-size:.78rem; }
+  .mut { color:var(--faint); }
+  .mbar { position:relative; }
+  .mbar i { position:absolute; left:0; top:0; bottom:0; background:rgba(88,166,255,.14); }
+  .mbar span { position:relative; }
+
+  .empty { background:var(--panel); border:1px dashed var(--line); border-radius:10px; padding:28px; text-align:center; color:var(--faint); }
+  .empty b { color:var(--ink); }
+  .foot { margin-top:30px; color:var(--faint); font-size:.74rem; }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#f6f8fa; --panel:#fff; --panel2:#f0f3f6; --line:#d0d7de; --line-soft:#eaeef2;
+           --ink:#1f2328; --soft:#424a53; --faint:#656d76; }
+  }
+
+/* Tab pill. Switching tabs runs a view transition (spa.js starts it for its
+   in-place swap; a real page load uses the browser's own) that carries one shared
+   pill from the old tab to the new one, with a little spring and stretch on the
+   way. Only the pill and the three tab labels take part: the page itself is left
+   out (root has no name), so everything else still changes in one paint rather
+   than cross-fading. The pill is its own element behind the links, not the
+   current link's background, so the text never moves or squashes; each label
+   only fades between its plain and selected colour. Browsers without view
+   transitions, and anyone who asks for less motion, just switch. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+:root { view-transition-name:none; }
+:root::view-transition { pointer-events:none; }
+header.console .nav { position:relative; }
+.navpill { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none;
+  border-radius:999px; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55);
+  view-transition-name:navpill; }
+.navlink { position:relative; }
+.navlink[href="/"] { view-transition-name:nav-overview; }
+.navlink[href="/claude"] { view-transition-name:nav-claude; }
+.navlink[href="/hetzner"] { view-transition-name:nav-hetzner; }
+.navlink[href="/config"] { view-transition-name:nav-deploy; }
+.navlink[href="/builds"] { view-transition-name:nav-builds; }
+.nav.pilled .navlink.current { color:#fff; background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled .navlink.current:hover { color:#fff; background:transparent; box-shadow:none; }
+}
+/* Dragging the pill (nav.js): while a finger steers it, the labels go plain
+   except the one under the pill, the pill swells a touch and follows the finger
+   directly, then springs onto the tab it is let go over. A hovering mouse
+   steers it the same way, minus the swell. pan-y keeps vertical
+   swipes scrolling the page; only sideways ones move the pill. */
+.nav.pilled .navlink.current:active { color:#fff; background:transparent; box-shadow:none; transition-duration: 60ms; }
+header.console .nav { touch-action:pan-y; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.nav.pilled.steer .navlink { color:var(--ink-soft); background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled.steer .navlink:hover { color:var(--ink-soft); background:transparent; box-shadow:none; }
+}
+.nav.pilled.steer .navlink:active { color:var(--ink-soft); background:transparent; box-shadow:none; transition-duration: 60ms; }
+.nav.pilled.steer .navlink.over { color:#fff; }
+.nav.steer .navpill { transition:left .34s cubic-bezier(.3,1.3,.5,1), width .22s ease, scale .2s ease; }
+.nav.dragging .navpill { transition:width .22s ease, scale .2s ease; scale:1.07; }
+@media (prefers-reduced-motion: reduce) { .nav.steer .navpill { transition:none; } }
+::view-transition-group(navpill) { animation-duration:.55s;
+  animation-timing-function:linear(0, 0.062, 0.204, 0.377, 0.548, 0.7, 0.822, 0.913, 0.976, 1.016, 1.037, 1.045, 1.045, 1.04, 1.032, 1.024, 1.017, 1.01, 1.006, 1.002, 1); }
+/* While it moves, the pill is drawn fresh rather than as a stretched picture of
+   the old and new pill, which would warp its round ends and double its edge. */
+::view-transition-old(navpill), ::view-transition-new(navpill) { animation:none; opacity:0; }
+::view-transition-image-pair(navpill) { border-radius:999px; background:var(--green-solid);
+  box-shadow:0 3px 11px -2px rgba(19,185,112,.55); animation:navpill-stretch .55s cubic-bezier(.3,0,.3,1); }
+@keyframes navpill-stretch { 0%,100% { scale:1; } 35% { scale:1.08 .88; } }
+::view-transition-group(nav-overview), ::view-transition-group(nav-claude), ::view-transition-group(nav-deploy), ::view-transition-group(nav-builds) { animation-duration:.25s; }
+</style>
+
+<style>
+/* ============================================================
+   Redesign layer — "instrument panel" console (shared identity)
+   Warm-neutral ink, one aqua signal accent, mono-forward
+   readouts, one header shared across every page. Dark, committed.
+   ============================================================ */
+:root {
+  --bg:#f6f9f7; --bg-2:#f1f5f2;
+  --panel:#ffffff; --panel2:#eef3f0; --panel-2:#eef3f0;
+  --line:#e4e9e5; --line-soft:#eef2ef;
+  --ink:#17211b; --soft:#55635b; --faint:#667469;
+  --blue:#2f6fed; --green:#0f9e58; --amber:#bd7d10; --red:#dc2f36;
+  --pink:#c9459a; --cyan:#0f9e58;
+  --signal:#0f9e58; --signal-bg:rgba(16,179,100,.12);
+  --r:14px;
+}
+body {
+  background:
+    radial-gradient(1200px 320px at 50% -140px, rgba(16,179,100,.05), transparent 70%),
+    var(--bg);
+  padding:0 18px 72px; max-width:1160px;
+}
+
+/* ---- shared console header ---- */
+header.console {
+  position:sticky; top:0; z-index:30;
+  margin:0 calc(50% - 50vw) 22px; padding:12px max(18px, calc(50vw - 560px));
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:#ffffff;
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+  border-bottom:1px solid var(--line);
+}
+header.console::after {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(180deg, rgba(255,255,255,.015) 0 1px, transparent 1px 3px);
+  -webkit-mask:linear-gradient(180deg,#000,transparent); mask:linear-gradient(180deg,#000,transparent);
+}
+.wordmark { display:flex; align-items:center; text-decoration:none;
+  font-family:var(--mono); font-size:.98rem; letter-spacing:-.01em; }
+.wordmark span:first-of-type { color:var(--ink); font-weight:600; }
+.wordmark span:last-of-type { color:var(--soft); font-weight:500; }
+.wordmark i { color:var(--signal); font-style:normal; margin:0 1px; text-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .wordmark:hover span:last-of-type { color:var(--ink); }
+}
+header.console .nav { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:auto; }
+.navlink { text-decoration:none; color:var(--soft); font-size:.82rem; font-weight:550;
+  padding:6px 11px; border-radius:8px; border:1px solid transparent; white-space:nowrap;
+  transition:color .15s, background-color .15s, border-color .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink:hover { color:var(--ink); background:var(--panel); }
+}
+.navlink:active { color:var(--ink); background:var(--panel); transition-duration: 60ms; }
+.navlink.current { color:var(--signal); border-color:var(--line); background:var(--panel);
+  box-shadow:inset 0 -2px 0 var(--signal); }
+.navlink:focus-visible { outline:2px solid var(--signal); outline-offset:2px; }
+
+/* ---- page title ---- */
+.pagehead { margin:24px 2px 4px; }
+.pagehead h1 { font-size:1.5rem; font-weight:680; letter-spacing:-.015em; margin:0; }
+.sub { color:var(--faint); font-size:.84rem; margin:5px 0 0; }
+
+/* ---- eyebrows + surfaces ---- */
+h2 { font-family:var(--mono); letter-spacing:.12em; color:var(--faint);
+  display:flex; align-items:center; gap:8px; }
+h2::before { content:""; width:11px; height:2px; background:var(--signal); border-radius:2px;
+  box-shadow:0 0 8px rgba(16,179,100,.55); flex:none; }
+.kpi, .bk, .win, .wrap, .empty { border-radius:var(--r); }
+.kpi, .bk, .win, .panel { box-shadow:0 1px 2px rgba(20,45,32,.05); }
+.kpi .n, .bk .big, .win .big, .kpi .l { font-family:var(--mono); }
+.kpi .n { letter-spacing:-.02em; }
+.kpi .l, .bk .rng { color:var(--faint); }
+
+
+/* window quota bars */
+.win .pbar i.g { background:var(--green); }
+.win .pbar i.y { background:var(--amber); }
+.win .pbar i.r { background:var(--red); }
+.lpill.ok { background:var(--green-bg,rgba(70,198,106,.15)); color:var(--green); }
+.lpill.warning { background:rgba(224,168,58,.16); color:var(--amber); }
+.lpill.rejected { background:rgba(242,86,74,.16); color:var(--red); }
+.badge { border-color:var(--line); color:var(--faint); }
+
+/* tables */
+th { font-family:var(--mono); letter-spacing:.06em; color:var(--faint); }
+.mbar i { background:rgba(16,179,100,.13); }
+.note code { background:var(--panel2); }
+
+.foot { color:var(--faint); font-family:var(--mono); }
+@media (max-width:560px){ header.console .nav { width:100%; margin-left:0; } }
+</style>
+
+<style>
+/* ============================================================
+   Fresh "health app" restyle — friendly light look
+   ============================================================ */
+:root{
+  color-scheme:light;
+  --bg:#f3f7f4; --bg-2:#e9f0ec; --panel:#ffffff; --panel2:#f1f6f2; --panel-2:#f1f6f2;
+  --line:#e6ede8; --line-soft:#eef3f0;
+  --ink:#12241a; --soft:#53625a; --ink-soft:#53625a; --faint:#61706a; --ink-faint:#61706a;
+  --green:#0a8f52; --green-solid:#13b970; --green-bg:#e6f7ee;
+  --amber:#b06a08; --amber-solid:#f5a524; --amber-bg:#fdf1de;
+  --red:#d92d20; --red-solid:#f04438; --red-bg:#fdecea;
+  --blue:#2563eb; --blue-solid:#3b82f6; --blue-bg:#e9f1fe;
+  --pink:#c9459a; --cyan:#0d9488; --signal:#0a8f52;
+  --display:ui-rounded,"SF Pro Rounded","Segoe UI Rounded",system-ui,sans-serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --shadow:0 1px 2px rgba(18,40,28,.05), 0 8px 24px -12px rgba(18,40,28,.14);
+  --r:16px;
+}
+body{ background:
+  radial-gradient(900px 380px at 88% -120px,#e3f3ea,transparent 70%),
+  radial-gradient(760px 320px at 6% -80px,#eaf2fb,transparent 70%),
+  var(--bg); color:var(--ink); font-family:var(--sans); }
+header.console{ background:#ffffff;
+  -webkit-backdrop-filter:none; backdrop-filter:none; border-bottom:1px solid var(--line); }
+header.console::after{ display:none; }
+.wordmark{ display:flex; align-items:center; gap:9px; text-decoration:none; font-family:var(--display); font-size:1.06rem; font-weight:750; letter-spacing:-.01em; color:var(--ink); }
+.wordmark .mk{ width:26px; height:26px; border-radius:9px; flex:none; position:relative; background:linear-gradient(150deg,#1ccb7b,#0f9a5c); box-shadow:0 3px 9px rgba(19,185,112,.42); }
+.wordmark .mk::after{ content:""; position:absolute; inset:0; margin:auto; width:9px; height:9px; border-radius:50%; background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.4); }
+.wordmark span.dim{ color:var(--faint); font-weight:650; }
+.navlink{ color:var(--ink-soft); font-weight:600; font-size:.85rem; padding:7px 14px; border-radius:999px; border:none; box-shadow:none; transition:color .15s,background-color .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink:hover{ color:var(--ink); background:var(--panel-2); }
+}
+.navlink:active { color:var(--ink); background:var(--panel-2); transition-duration: 60ms; }
+.navlink.current{ color:#fff; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55); }
+.navlink:focus-visible{ outline:2px solid var(--green-solid); outline-offset:2px; }
+.pill{ border:1px solid var(--line); box-shadow:var(--shadow); font-weight:600; }
+.pill.live{ color:var(--green); } .pill.live .lamp{ background:var(--green-solid); box-shadow:0 0 0 3px rgba(19,185,112,.2); }
+.pagehead h1{ font-family:var(--display); font-weight:770; letter-spacing:-.02em; }
+.sub{ color:var(--soft); }
+h2{ font-family:var(--display); font-weight:700; font-size:1.05rem; letter-spacing:-.01em; color:var(--ink); text-transform:none; }
+h2::before{ display:none !important; }
+.kpi,.bk,.win,.wrap,.empty{ border-radius:var(--r); box-shadow:var(--shadow); border-color:var(--line); }
+.kpi .n,.bk .big,.win .big{ font-family:var(--display); }
+.kpi .l,.bk .rng{ color:var(--faint); }
+/* One colour for all three bars. The bar length already encodes the value and the
+   card title carries the identity, so a second encoding would only spend a hue on
+   what is already shown — and the old amber "high" read as a warning when a slow
+   reply is simply a bigger task. Amber and red stay reserved for the quota bars,
+   where they actually mean something. */
+.bk .bar i{ background:var(--green-solid); }
+.win .pbar i.g{ background:var(--green-solid); } .win .pbar i.y{ background:var(--amber-solid); } .win .pbar i.r{ background:var(--red-solid); }
+.lpill.ok{ color:var(--green); background:var(--green-bg); } .lpill.warning{ color:var(--amber); background:var(--amber-bg); } .lpill.rejected{ color:var(--red); background:var(--red-bg); }
+.mbar i{ background:rgba(19,185,112,.13); }
+.bar i{ background:var(--green-solid); }
+.foot{ color:var(--faint); font-family:var(--sans); }
+
+/* Two short tables side by side instead of stacked — they are narrow enough that
+   stacking them wasted the right half of the page and pushed everything down. */
+.duo{ display:grid; grid-template-columns:1fr 1fr; gap:0 22px; align-items:start; }
+.duo > div > h2{ margin-top:26px; }
+@media (max-width:760px){ .duo{ grid-template-columns:1fr; gap:0; } }
+
+/* A row count sits with the heading rather than in a sentence beneath it. */
+h2 .hcount{ font-family:var(--sans); font-size:.72rem; font-weight:600; color:var(--faint);
+  background:var(--panel2); border-radius:999px; padding:2px 9px; margin-left:9px; letter-spacing:0; }
+
+/* The one-line quota note reads as a caption, not a paragraph. */
+.note{ font-size:.75rem; margin-top:10px; }
+.note [title]{ cursor:help; border-bottom:1px dotted #b9c6bf; padding-bottom:1px; }
+/* When the phone is set to dark: the same dashboard at night. Near-black green panels, light
+   ink, and the status colours lifted a shade so they read on dark. The service hues and the
+   charts' series colours are mid-tones that work on both, so they stay. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme:dark;
+    --bg:#0e1411; --bg-2:#131b17; --panel:#161e1a; --panel-2:#1c2621; --panel2:#1c2621;
+    --line:#26312b; --line-soft:#1f2924;
+    --ink:#e4ede7; --ink-soft:#a2b1a8; --soft:#a2b1a8; --ink-faint:#85948b; --faint:#85948b;
+    --green:#3fd08a; --green-bg:rgba(19,185,112,.15);
+    --amber:#f2b04f; --amber-bg:rgba(245,165,36,.15);
+    --red:#ff7a6e; --red-bg:rgba(240,68,56,.15);
+    --blue:#7aa7ff; --blue-bg:rgba(59,130,246,.16);
+    --pink:#e67fc0; --cyan:#3cc4b6; --signal:#3fd08a;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    --shadow-lift:0 2px 6px rgba(0,0,0,.35), 0 16px 32px -14px rgba(0,0,0,.7);
+  }
+  body { background:
+      radial-gradient(900px 380px at 88% -120px, rgba(19,185,112,.10), transparent 70%),
+      radial-gradient(760px 320px at 6% -80px, rgba(59,130,246,.08), transparent 70%),
+      var(--bg); }
+  header.console { background:#0e1411; }
+  .note [title] { border-bottom-color:#4a5850; }
+}
+  /* ---------- Hetzner offers chart ---------- */
+  .h3d { position:relative; margin-top:18px; border:1px solid var(--line); border-radius:16px;
+    background:var(--panel); overflow:hidden; touch-action:none; cursor:grab; aspect-ratio:4/3; max-height:72vh; width:100%; }
+  .h3d.grabbing { cursor:grabbing; }
+  @media (max-width:560px){ .h3d { aspect-ratio:1/1.1; } }
+  .h3d .tip { position:absolute; left:0; top:0; pointer-events:none; display:none; max-width:calc(100% - 16px);
+    padding:5px 9px; border-radius:8px; font-size:12px; line-height:1.35; color:var(--ink);
+    background:var(--panel); border:1px solid var(--line); box-shadow:0 4px 14px rgba(0,0,0,.18); }
+  .h3d .tip b { font-weight:650; }
+  .h3d .tip span { white-space:nowrap; }
+  .h3d canvas { display:block; width:100%; height:100%; }
+/* Five tabs fit on one line on a phone only with tighter spacing. */
+@media (max-width:560px){ header.console .nav{ flex-wrap:nowrap; gap:0; justify-content:space-between; }
+  .navlink{ padding:7px 7px; } }
+</style>
+</head>
+<body>
+  <header class="console">
+    <a class="wordmark" href="/"><span class="mk"></span>osmosis&nbsp;<span class="dim">health</span></a>
+    <div class="nav">
+      <span class="navpill" aria-hidden="true"></span>
+      <a class="navlink" href="/">Overview</a>
+      <a class="navlink" href="/claude">Claude</a>
+      <a class="navlink current" href="/hetzner">Hetzner</a>
+      <a class="navlink" href="/config">Deploy</a>
+      <a class="navlink" href="/builds">Builds</a>
+    <script>navPill(); // the tab pill — see nav.js</script>
+    </div>
+  </header>
+  <div class="h3d" id="h3d" data-noswipe><div class="tip" id="h3dt"></div><canvas id="h3dc" aria-label="Hetzner offers: price, distance from Amsterdam and specs, with the zone of better deals shaded"></canvas></div>
+
+<script>
+// Every server Hetzner sells (same processor kind as ours), as dots in a cube:
+// x = monthly price, y = distance from Amsterdam, z = specs (ours = 1). All three
+// on log scales, since prices and distances span two orders of magnitude.
+// Ours is the large green dot; a better deal would show in amber, inside the
+// shaded box of cheaper, nearer and bigger-than-ours. Drag to turn.
+(() => {
+  const box = document.getElementById('h3d'), cv = document.getElementById('h3dc');
+  const ctx = cv.getContext('2d');
+  let offers = [], yaw = -0.7, pitch = 0.42, drag = null, idleSince = 0, lastT = 0;
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+  const norm = (vals) => {
+    const lv = vals.map(Math.log), lo = Math.min(...lv), hi = Math.max(...lv), span = (hi - lo) || 1;
+    return (v) => (Math.log(v) - lo) / span * 2 - 1;
+  };
+  // Distance starts at 0 km on the floor, so the closest offer isn't pinned to the bottom.
+  // Square root keeps the European sites apart from the far ones.
+  const fromZero = (vals) => {
+    const hi = Math.sqrt(Math.max(...vals)) || 1;
+    return (v) => Math.sqrt(v) / hi * 2 - 1;
+  };
+  let pts = [], ours = null, shown = [], tip = null; // tip: the dot whose details show
+  function build() {
+    const nx = norm(offers.map(o => o.price)), ny = norm(offers.map(o => o.spec)), nz = fromZero(offers.map(o => o.km));
+    pts = offers.map(o => ({ x: nx(o.price), y: nz(o.km), z: ny(o.spec), ours: o.ours, deal: o.deal, o }));
+    ours = pts.find(p => p.ours) || null;
+  }
+
+  function project(p, w, h) {
+    const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const x1 = p.x * cy - p.z * sy, z1 = p.x * sy + p.z * cy;
+    const y2 = p.y * cp - z1 * sp, z2 = p.y * sp + z1 * cp;
+    const f = 3.6 / (3.6 + z2), s = Math.min(w, h) * 0.24;
+    return { x: w / 2 + x1 * s * f, y: h / 2 - y2 * s * f, f, d: z2 };
+  }
+
+  function draw() {
+    const dpr = window.devicePixelRatio || 1, w = box.clientWidth, h = box.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) {
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    // The cube's twelve edges, with the three axes from the cheap / small / near
+    // corner drawn stronger.
+    const c = [-1, 1], corners = [];
+    for (const x of c) for (const y of c) for (const z of c) corners.push({ x, y, z });
+    const P = corners.map(q => project(q, w, h));
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = css('--line');
+    for (let i = 0; i < 8; i++) for (let j = i + 1; j < 8; j++) {
+      const a = corners[i], b = corners[j];
+      if ((a.x !== b.x) + (a.y !== b.y) + (a.z !== b.z) !== 1) continue;
+      ctx.beginPath(); ctx.moveTo(P[i].x, P[i].y); ctx.lineTo(P[j].x, P[j].y); ctx.stroke();
+    }
+    // The switch zone: cheaper than ours, no farther away, and at least our specs.
+    // A dot that lands inside it is a server we would move to.
+    if (ours) {
+      const X = [-1, ours.x], Y = [-1, ours.y], Z = [ours.z, 1];
+      const v = (i, j, k) => project({ x: X[i], y: Y[j], z: Z[k] }, w, h);
+      const faces = [
+        [v(0,0,0), v(1,0,0), v(1,1,0), v(0,1,0)], [v(0,0,1), v(1,0,1), v(1,1,1), v(0,1,1)],
+        [v(0,0,0), v(0,0,1), v(0,1,1), v(0,1,0)], [v(1,0,0), v(1,0,1), v(1,1,1), v(1,1,0)],
+        [v(0,0,0), v(1,0,0), v(1,0,1), v(0,0,1)], [v(0,1,0), v(1,1,0), v(1,1,1), v(0,1,1)],
+      ];
+      ctx.fillStyle = css('--amber'); ctx.strokeStyle = css('--amber'); ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      for (const f of faces) {
+        ctx.beginPath(); f.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath();
+        ctx.globalAlpha = 0.06; ctx.fill();
+        ctx.globalAlpha = 0.5; ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+    // The three axes from the cheap / small / near corner, each named at its far
+    // end, the label pushed outward from the cube's centre so it clears the line.
+    const o = project({ x: -1, y: -1, z: -1 }, w, h), mid = project({ x: 0, y: 0, z: 0 }, w, h);
+    ctx.font = '600 12px -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    [[{ x: 1, y: -1, z: -1 }, '--blue', 'Price'], [{ x: -1, y: 1, z: -1 }, '--amber', 'Distance'],
+     [{ x: -1, y: -1, z: 1 }, '--green', 'Specs']].forEach(([q, col, label]) => {
+      const e = project(q, w, h);
+      ctx.strokeStyle = css(col); ctx.globalAlpha = 0.55; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(e.x, e.y); ctx.stroke();
+      const dx = e.x - mid.x, dy = e.y - mid.y, n = Math.hypot(dx, dy) || 1;
+      ctx.globalAlpha = 1; ctx.fillStyle = css(col);
+      ctx.fillText(label, e.x + dx / n * 22, e.y + dy / n * 16);
+    });
+    ctx.globalAlpha = 1;
+    // Far dots first, so nearer ones sit on top; ours last of all.
+    shown = pts.map(p => ({ p, q: project(p, w, h) }))
+      .sort((a, b) => (a.p.ours - b.p.ours) || (b.q.d - a.q.d));
+    for (const { p, q } of shown) {
+      const r = (p.ours ? 9 : p.deal ? 7 : 4.5) * q.f;
+      ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = css(p.ours ? '--green' : p.deal ? '--amber' : '--faint');
+      ctx.globalAlpha = p.ours || p.deal ? 1 : 0.35 + 0.4 * (q.f - 0.7);
+      ctx.fill();
+      if (p.ours) { ctx.globalAlpha = 0.35; ctx.lineWidth = 3; ctx.strokeStyle = css('--green');
+        ctx.beginPath(); ctx.arc(q.x, q.y, r + 5, 0, Math.PI * 2); ctx.stroke(); }
+      if (p === tip) { ctx.globalAlpha = 1; ctx.lineWidth = 2; ctx.strokeStyle = css('--ink');
+        ctx.beginPath(); ctx.arc(q.x, q.y, r + 3, 0, Math.PI * 2); ctx.stroke(); }
+      q.r = r;
+    }
+    ctx.globalAlpha = 1;
+    placeTip(w, h);
+  }
+
+  // Details for one dot, in a single short line beside it.
+  const tipEl = document.getElementById('h3dt');
+  const esc = (v) => String(v).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtGB = (g) => g >= 1000 ? (g / 1000).toFixed(g % 1000 ? 1 : 0) + ' TB' : g + ' GB';
+  function setTip(p) {
+    if (p === tip) return;
+    tip = p;
+    if (!p) { tipEl.style.display = 'none'; return; }
+    const o = p.o;
+    const eur = o.price >= 100 ? Math.round(o.price) : o.price.toFixed(2);
+    tipEl.innerHTML = `<span><b>€${eur}</b> · ${o.km.toLocaleString()} km (${esc(o.city)}) ·</span> `
+      + `<span>${o.cores} CPU, ${o.memory} GB, ${fmtGB(o.disk)}</span>`;
+    tipEl.style.display = 'block';
+  }
+  function placeTip(w, h) {
+    if (!tip) return;
+    const hit = shown.find(s => s.p === tip);
+    if (!hit) return setTip(null);
+    const tw = tipEl.offsetWidth, th = tipEl.offsetHeight, m = 8;
+    let x = hit.q.x - tw / 2, y = hit.q.y - hit.q.r - th - 10;
+    if (y < m) y = hit.q.y + hit.q.r + 10;
+    x = Math.max(m, Math.min(w - tw - m, x));
+    tipEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  }
+  // The topmost dot under a point, with a little slack so small dots are easy to hit.
+  function pick(e) {
+    const b = box.getBoundingClientRect(), x = e.clientX - b.left, y = e.clientY - b.top;
+    for (let i = shown.length - 1; i >= 0; i--) {
+      const { p, q } = shown[i];
+      if (Math.hypot(q.x - x, q.y - y) <= q.r + (e.pointerType === 'mouse' ? 4 : 10)) return p;
+    }
+    return null;
+  }
+
+  // Turns slowly on its own; a drag takes over and the spin resumes a few
+  // seconds after letting go. Stops for good once the page is swapped away.
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(t) {
+    if (!cv.isConnected) return;
+    const dt = lastT ? Math.min(t - lastT, 50) : 0; lastT = t;
+    if (!drag && !tip && !reduce && t - idleSince > 2500) yaw += dt * 0.00018;
+    draw();
+    requestAnimationFrame(frame);
+  }
+  box.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, yaw, pitch };
+    box.setPointerCapture(e.pointerId); box.classList.add('grabbing');
+  });
+  // A mouse shows details on hover; a finger shows them on a tap, and a tap
+  // anywhere else hides them. The cube holds still while they show.
+  box.addEventListener('pointermove', (e) => {
+    if (!drag) { if (e.pointerType === 'mouse') setTip(pick(e)); return; }
+    if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6) { drag.moved = true; if (e.pointerType === 'mouse') setTip(null); }
+    yaw = drag.yaw + (e.clientX - drag.x) * 0.008;
+    pitch = Math.max(-1.4, Math.min(1.4, drag.pitch - (e.clientY - drag.y) * 0.008));
+  });
+  box.addEventListener('pointerleave', (e) => { if (e.pointerType === 'mouse' && !drag) setTip(null); });
+  box.addEventListener('pointerup', (e) => {
+    if (drag && !drag.moved) { setTip(pick(e)); idleSince = performance.now(); }
+  });
+  const release = () => { drag = null; idleSince = performance.now(); box.classList.remove('grabbing'); };
+  box.addEventListener('pointerup', release);
+  box.addEventListener('pointercancel', release);
+
+  async function load() {
+    try {
+      const r = await fetch('/api/hetzner', { cache: 'no-store' });
+      if (!r.ok) return;
+      const d = await r.json();
+      offers = (d.offers || []).filter(o => o.price > 0 && o.km > 0 && o.spec > 0);
+      build();
+    } catch (_) {}
+  }
+  load();
+  setInterval(load, 10 * 60 * 1000);
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

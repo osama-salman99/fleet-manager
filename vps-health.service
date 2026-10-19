@@ -1,0 +1,13 @@
+[Unit]
+Description=VPS Health Dashboard
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/vps-health
+ExecStart=/opt/vps-health/vps-health
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

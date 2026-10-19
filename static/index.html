@@ -1,0 +1,2630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health</title>
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1411" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<script src="/spa.js"></script>
+<script src="/dom.js"></script>
+<script src="/nav.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2129;
+    --line: #30363d;
+    --line-soft: #21262d;
+    --ink: #e6edf3;
+    --ink-soft: #9aa5b1;
+    --ink-faint: #6e7681;
+    --blue: #58a6ff;
+    --blue-bg: rgba(88,166,255,.13);
+    --green: #3fb950;
+    --green-bg: rgba(63,185,80,.13);
+    --amber: #d29922;
+    --amber-bg: rgba(210,153,34,.14);
+    --red: #f85149;
+    --red-bg: rgba(248,81,73,.13);
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 24px 18px 64px; }
+  .mono { font-family: var(--mono); }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 14px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .brand h1 { font-size: 1.35rem; font-weight: 650; letter-spacing: -0.01em; }
+  .brand .host { color: var(--ink-faint); font-size: 0.85rem; font-family: var(--mono); }
+  /* wrap on narrow screens: the pill + Claude/QA Reports/Deployments buttons are
+     ~460px wide and were overflowing a ~360px phone viewport, forcing the whole page
+     to scroll horizontally. flex-wrap lets them flow onto a second line; no-op on desktop. */
+  .hactions { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 11px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--panel);
+    font-size: 0.78rem; color: var(--ink-soft); white-space: nowrap;
+  }
+  .pill .lamp { width: 7px; height: 7px; }
+  .pill.live .lamp { background: var(--green); animation: pulse 2s ease-in-out infinite; }
+  .pill.stale { border-color: var(--amber); color: var(--amber); }
+  .pill.stale .lamp { background: var(--amber); animation: none; }
+
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--panel);
+    color: var(--ink-soft); font-size: 0.83rem; font-weight: 550;
+    text-decoration: none; white-space: nowrap;
+    transition: background-color .15s, border-color .15s, color .15s;
+  }
+  @media (hover: hover) and (pointer: fine) {
+      .btn:hover { background: var(--panel-2); border-color: #8b949e; color: var(--ink); }
+  }
+  .btn:active { background: var(--panel-2); border-color: #8b949e; color: var(--ink); transition-duration: 60ms; }
+  a:focus-visible, .btn:focus-visible, .card:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 2px;
+  }
+
+  /* ---------- verdict ---------- */
+  .verdict {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 18px; margin-bottom: 18px;
+    border: 1px solid var(--line); border-left-width: 4px;
+    border-radius: 10px; background: var(--panel);
+  }
+  .verdict .glyph {
+    width: 30px; height: 30px; flex: none; border-radius: 50%;
+    display: grid; place-items: center; font-size: 15px; font-weight: 700;
+  }
+  .verdict h2 { font-size: 1.05rem; font-weight: 650; line-height: 1.3; }
+  .verdict p { font-size: 0.85rem; color: var(--ink-faint); margin-top: 1px; }
+
+  .verdict.ok    { border-left-color: var(--green); }
+  .verdict.ok .glyph    { background: var(--green-bg); color: var(--green); }
+  .verdict.ok h2        { color: var(--green); }
+  .verdict.warn  { border-left-color: var(--amber); }
+  .verdict.warn .glyph  { background: var(--amber-bg); color: var(--amber); }
+  .verdict.warn h2      { color: var(--amber); }
+  .verdict.bad   { border-left-color: var(--red); }
+  .verdict.bad .glyph   { background: var(--red-bg); color: var(--red); }
+  .verdict.bad h2       { color: var(--red); }
+  .verdict.busy  { border-left-color: var(--blue); }
+  .verdict.busy .glyph  { background: var(--blue-bg); color: var(--blue); }
+  .verdict.busy h2      { color: var(--blue); }
+  .verdict.idle { border-left-color: var(--line); }
+  .verdict.idle .glyph  { background: var(--panel-2); color: var(--ink-faint); }
+
+  /* ---------- KPI tiles ---------- */
+  .kpis {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px; margin-bottom: 26px;
+  }
+  .kpi {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .kpi .l {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-faint); font-weight: 600;
+  }
+  .kpi .v { font-size: 1.45rem; font-weight: 700; line-height: 1.25; margin-top: 2px; }
+  .kpi .v small { font-size: 0.8rem; font-weight: 600; color: var(--ink-faint); margin-left: 2px; }
+  .kpi .s { font-size: 0.75rem; color: var(--ink-faint); }
+  .kpi.warn .v { color: var(--amber); }
+  .kpi.bad  .v { color: var(--red); }
+
+  /* ---------- service colours ----------
+     One colour per service, used by both the memory bar and the CPU-by-service
+     chart, so a swatch means the same thing wherever it appears on the page.
+
+     Fourteen of them, because there are thirteen services and every one of them
+     is now named rather than swept into a "smaller services" heap. Seven hues
+     spread evenly round the wheel, each at two darknesses; the paler seven come
+     first, so the services big enough to be seen in the memory bar get the
+     livelier end.
+
+     Fourteen is more than colour alone can honestly carry, and this is measured
+     rather than eyeballed: against the white card all fourteen clear 3:1, none
+     of them is so weak it reads as grey, but the closest pair is about half as
+     far apart as the ideal and closer still to someone who is colour-blind.
+     Which is why nothing here depends on colour alone — every band is named in
+     the key beneath the chart and every slice is named beside the bar. The
+     colour ties a mark to its row; the row says which service it is. */
+  :root {
+    --svc-1:  #0095d5;
+    --svc-2:  #d06829;
+    --svc-3:  #00a49d;
+    --svc-4:  #b167c0;
+    --svc-5:  #aa8400;
+    --svc-6:  #747de2;
+    --svc-7:  #d15d7d;
+    --svc-8:  #006498;
+    --svc-9:  #923e00;
+    --svc-10: #7b3e86;
+    --svc-11: #836100;
+    --svc-12: #4a50a2;
+    --svc-13: #008e86;
+    --svc-14: #933451;
+    --svc-rest:  #8b949e;  /* only if there are ever more services than colours */
+    --sys:       #656c76;  /* everything else running on the VPS */
+
+    /* Free memory and page cache are the same colour one step apart, because
+       they are the same thing to a degree: cache is memory you can have back the
+       moment you ask, you just pay a disk read for it. Grey said "spoken for",
+       which is the opposite of true — and it made 119 MB of free memory look
+       like the VPS was out of room when 1 GB of it was cache.
+       Both greens clear 3:1 on the panel and sit deltaE 26 apart. */
+    --cache:     #338048;  /* yours when you need it — at the cost of a disk read */
+    --free:      #3fb950;  /* yours right now */
+  }
+
+  /* The bar is vertical: a fixed-width column standing beside its legend. Segment
+     heights come from flex-grow (proportional to the value) so the stack divides
+     whatever height the row settles at — which is the legend's, via stretch — with
+     no dependency on a definite parent height. */
+  /* Memory and Storage sit side by side on a wide screen. Memory keeps its bar on
+     the right, Storage on the left, so the two bars meet in the middle with the
+     legends flanking the outer edges. */
+  /* margin-bottom matches a normal section's, so "Services" below clears the
+     bars instead of crowding them (the bar is taller than the legend on a
+     phone, and section margins don't collapse out of a grid item). */
+  .mem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 32px; margin-bottom: 26px; }
+  .mem-grid > section { margin-bottom: 0; }
+  /* Memory's bar is on the right, so flip its header row to put the "Memory"
+     title over the bar (and the used/total note over the legend) — mirroring
+     Storage, whose title already sits over its left-hand bar. */
+  #mem-section .sec-head { flex-direction: row-reverse; }
+  .mem-row { display: flex; align-items: stretch; gap: 18px; }
+  .mem-row .mem-legend { flex: 1 1 auto; min-width: 0; }   /* legend fills, pushing the bar to the edge */
+  .membar {
+    display: flex; flex-direction: column; gap: 2px;   /* the gap IS the separator — no borders */
+    width: 60px; min-height: 240px; flex: none;        /* fixed width; height stretches to the legend */
+    background: var(--line-soft); border-radius: 6px; overflow: hidden;
+  }
+  .memseg { width: 100%; min-height: 2px; transition: flex-grow .6s ease; }
+  .memseg:first-child { border-radius: 6px 6px 0 0; }
+  .memseg:last-child  { border-radius: 0 0 6px 6px; }
+
+  /* Cached memory is the same green as Free — it IS free, one disk read away — but
+     hatched so the two still read apart without spending a second hue. The colour
+     is set with background-COLOR (not the shorthand) everywhere so this overlay
+     survives. */
+  .hatch { background-image: repeating-linear-gradient(45deg,
+             rgba(0,0,0,.20) 0 4px, rgba(0,0,0,0) 4px 9px); }
+  @media (prefers-color-scheme: dark) {
+    .hatch { background-image: repeating-linear-gradient(45deg,
+               rgba(0,0,0,.34) 0 4px, rgba(0,0,0,0) 4px 9px); }
+  }
+
+  /* An unstacked, ranked read of the same bar: one row per slice, biggest first,
+     each with a mini proportion bar (scaled to the largest slice) so the order is
+     legible at a glance and the row uses its width instead of stranding the value
+     far to the right. Four fixed columns — swatch · label · bar · value — keep
+     everything aligned like a small horizontal bar chart; inline-grid keeps the
+     whole block only as wide as it needs rather than stretching across the page. */
+  .mem-legend { display: inline-grid;
+    grid-template-columns: auto auto minmax(120px, 1fr) auto;
+    align-items: center; gap: 5px 15px; font-size: 0.8rem; }
+  /* One wrapper per legend row so a row can be patched as a unit; display:contents
+     hands its four cells straight back to the legend's grid, so it lays out
+     exactly as it did when the cells were direct children. */
+  .mem-legend .lrow { display: contents; }
+  .mem-legend .lbl { white-space: nowrap; color: var(--ink-soft); }
+  .mem-legend .rail { height: 7px; border-radius: 4px; background: var(--line-soft); overflow: hidden; }
+  .mem-legend .rail > i { display: block; height: 100%; border-radius: 4px; min-width: 2px; }
+  .mem-legend b { justify-self: end; color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  /* A full-width hairline (spans every column) between the per-service rows and
+     the system/cache/free rows, so the two groups read apart without a heading. */
+  .mem-legend .legend-div { grid-column: 1 / -1; height: 1px; background: var(--line); margin: 5px 0; }
+
+  /* the swatch that ties a service to its slice */
+  .sw {
+    width: 9px; height: 9px; border-radius: 2px; flex: none;
+    display: inline-block; vertical-align: middle;
+  }
+
+  /* ---------- sections ---------- */
+  section { margin-bottom: 26px; }
+  .sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin-bottom: 11px;
+  }
+  h3 {
+    font-size: 0.75rem; text-transform: uppercase; letter-spacing: .07em;
+    color: var(--ink-faint); font-weight: 650;
+  }
+  .sec-note { font-size: 0.75rem; color: var(--ink-faint); }
+
+  /* ---------- app cards ---------- */
+  .apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 10px; }
+  .card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 13px 15px;
+    transition: border-color .15s, background-color .15s, transform .15s;
+  }
+  @media (hover: hover) and (pointer: fine) {
+      a.card:hover { border-color: #8b949e; background: var(--panel-2); transform: translateY(-1px); }
+  }
+  a.card:active { border-color: #8b949e; background: var(--panel-2); transform: translateY(-1px); transition-duration: 60ms; }
+  .card.down { border-color: rgba(248,81,73,.5); background: linear-gradient(var(--red-bg), var(--red-bg)) , var(--panel); }
+  .card.busy { border-color: rgba(88,166,255,.5); background: linear-gradient(var(--blue-bg), var(--blue-bg)), var(--panel); }
+
+  .card-top { display: flex; align-items: center; gap: 7px; }
+  /* Small GitHub mark → the service's repo. It's a button (not a link) because the
+     card is already an <a>, and its click is stopped from opening the service. */
+  .gh { flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 24px; height: 24px; padding: 0; border: none; background: none; cursor: pointer;
+    color: var(--ink-faint); border-radius: 7px; transition: color .15s, background-color .15s; }
+  @media (hover: hover) and (pointer: fine) {
+      .gh:hover { color: var(--ink); background: var(--panel-2); }
+  }
+  .gh:active { color: var(--ink); background: var(--panel-2); transition-duration: 60ms; }
+  .gh:focus-visible { outline: 2px solid var(--green-solid); outline-offset: 1px; }
+  .gh[hidden] { display: none; }
+  .gh svg { display: block; }
+  /* The icon says which service; the lamp says how it is doing. Different jobs,
+     so they stay separate marks rather than one coloured blob. Kept small: the
+     name is the thing being read, and the icon is what your eye lands on first. */
+  .ico { width: 17px; height: 17px; flex: none; display: block; }
+  .ico[hidden] { display: none; }
+  .irow .ico { width: 15px; height: 15px; }
+  .lamp { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--ink-faint); }
+  .lamp.up   { background: var(--green); box-shadow: 0 0 7px rgba(63,185,80,.6); }
+  .lamp.down { background: var(--red);   box-shadow: 0 0 7px rgba(248,81,73,.6); }
+  .lamp.warn { background: var(--amber); box-shadow: 0 0 7px rgba(210,153,34,.6); }
+  .lamp.na   { background: var(--ink-faint); }
+  /* A deploy is the one state that is going somewhere, so it is the one that moves. */
+  .lamp.busy { background: var(--blue); box-shadow: 0 0 7px rgba(88,166,255,.6); animation: pulse 1.1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { .lamp.busy { animation: none; } }
+
+  .card-name { font-weight: 600; font-size: 0.95rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge {
+    font-size: 0.66rem; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  }
+  .badge.up   { color: var(--green); background: var(--green-bg); }
+  .badge.down { color: var(--red);   background: var(--red-bg); }
+  .badge.warn { color: var(--amber); background: var(--amber-bg); }
+  .badge.na   { color: var(--ink-faint); background: var(--panel-2); }
+  .badge.busy { color: var(--blue);  background: var(--blue-bg); }
+
+  /* How hard a service is stalling on memory (kernel PSI), graded into four
+     levels and shown on every card so the current reading is always there to see —
+     not only during a fire. Calm is deliberately quiet (grey, no fill to speak of)
+     so a healthy fleet does not shout; the ramp then goes cool→warm→hot as it
+     climbs: blue is a note, amber a warning, red is work having stopped. The word
+     is prefixed "mem" so a lone "CALM" is never a mystery. */
+  .load {
+    font-size: 0.66rem; font-weight: 700; padding: 1px 7px 1px 6px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .load::before {
+    content: "mem"; font-size: 0.86em; font-weight: 700; opacity: .55;
+    letter-spacing: 0; margin-right: 1px;
+  }
+  .load.calm   { color: var(--ink-faint); background: var(--panel-2); }
+  .load.light  { color: var(--blue);  background: var(--blue-bg); }
+  .load.medium { color: var(--amber); background: var(--amber-bg); }
+  .load.heavy  { color: var(--red);   background: var(--red-bg); }
+
+  .card-meta {
+    margin-top: 9px; display: flex; flex-wrap: wrap; gap: 4px 9px;
+    font-size: 0.78rem; color: var(--ink-faint);
+  }
+  .card-meta > span { white-space: nowrap; }   /* never split "health ok" across lines */
+  .card-meta .sep { color: var(--line); }
+  .card-meta b { color: var(--ink-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
+  /* A memory figure only means something next to the ceiling it dies at. */
+  .card-meta b.warn { color: var(--amber); }
+  .card-meta b.bad  { color: var(--red); }
+  .card-meta .cap   { color: var(--ink-faint); }
+  .card-ver { margin-top: 7px; font-size: 0.74rem; font-family: var(--mono); color: var(--ink-faint); }
+  .card-ver .old { color: var(--amber); }
+  .card-ver .new { color: var(--blue); }
+
+  /* ---------- what is inside a container ---------- */
+  /* The workspace is not a program, it is a machine full of them. Its slice of the
+     bar above gets drawn a second time here, split by what is actually holding it. */
+  .split { margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--line); }
+  .split-bar {
+    display: flex; gap: 2px; height: 8px; margin-bottom: 7px;
+    background: var(--line-soft); border-radius: 4px; overflow: hidden;
+  }
+  .split-bar i { height: 100%; min-width: 2px; transition: width .6s ease; }
+  .split-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.72rem; color: var(--ink-faint); }
+  .split-legend span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .split-legend b { color: var(--ink-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .split-legend em { font-style: normal; opacity: .7; }   /* the ×3 */
+
+  /* ---------- infra rows ---------- */
+  .infra {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 1px;
+    background: var(--line-soft); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden;
+  }
+  .irow {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 13px; background: var(--panel);
+    text-decoration: none; color: inherit; font-size: 0.85rem;
+  }
+  @media (hover: hover) and (pointer: fine) {
+      a.irow:hover { background: var(--panel-2); }
+  }
+  a.irow:active { background: var(--panel-2); transition-duration: 60ms; }
+  .irow .lamp, .irow .ico { flex: none; }
+  .irow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .irow .up { font-size: 0.74rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  /* A sentence-long note (the Hetzner watcher's) would squeeze the name out of
+     the row, so it drops to its own line under the name instead. */
+  .irow.long { display: grid; grid-template-columns: auto auto 1fr; column-gap: 8px; row-gap: 3px; }
+  .irow.long > * { grid-row: 1; }
+  .irow.long .lamp { grid-column: 1; } .irow.long .ico { grid-column: 2; } .irow.long .nm { grid-column: 3; }
+  .irow.long .up:not(.lamp) { grid-column: 3; grid-row: 2; line-height: 1.35; text-wrap: balance; }
+  .irow .up .sw[hidden] { display: none; }
+
+  /* ---------- charts ---------- */
+  .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 14px 16px 12px;
+  }
+  .panel-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 10px; margin-bottom: 10px;
+  }
+  .panel-head .t { font-size: 0.78rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); }
+  /* A qualifier after a panel's name — how often the numbers underneath are
+     actually read. Written as ordinary words rather than in the title's small
+     capitals, so it reads as a note and not as part of the name. */
+  .panel-head .t small { text-transform: none; letter-spacing: 0; font-weight: 500; opacity: .85; white-space: nowrap; }
+  /* On a phone the name and its qualifier need two lines; break between them
+     rather than through the middle of the name. */
+  .panel-head .t .tname { white-space: nowrap; }
+  .panel-head .v { font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .panel-head .v small { font-size: 0.75rem; color: var(--ink-faint); font-weight: 600; }
+  .chart { position: relative; height: 132px; }
+  .chart canvas { width: 100%; height: 100%; display: block; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 9px; font-size: 0.74rem; color: var(--ink-faint); }
+  .legend i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+  .legend b { color: var(--ink-soft); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* The key under the CPU-by-service chart. Every service is named there, which
+     is a dozen rows and more — far too many for the wrapping line of text the
+     other charts use, where each entry starts wherever the one before it ended.
+     A grid instead: swatch, name and figure each get a column, so the swatches
+     line up down one edge and the figures down the other, and the rows flow into
+     as many columns as the panel is wide enough to hold. */
+  .svc-key {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 2px 24px; margin-top: 12px; font-size: 0.75rem;
+  }
+  .svc-key .krow {
+    display: grid; grid-template-columns: 9px minmax(0, 1fr) auto;
+    align-items: center; gap: 8px; padding: 1px 0;
+  }
+  .svc-key i { width: 9px; height: 9px; border-radius: 2px; }
+  .svc-key .lbl { color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .svc-key b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  /* Idle all minute: still listed, but quietened so the busy ones carry the eye. */
+  .svc-key .quiet { opacity: .45; }
+
+  /* per-core strip — one bar per core, so a single pegged core is visible even
+     when the overall line looks calm */
+  .cores-wrap {
+    display: flex; align-items: center; gap: 12px;
+    margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--line-soft);
+  }
+  .cores-label {
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--ink-faint); font-weight: 650; flex: none;
+  }
+  .cores { display: flex; gap: 10px; flex: 1; min-width: 0; }
+  .core { flex: 1; min-width: 0; }
+  .core-bar { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .core-bar i { display: block; height: 100%; background: var(--blue); border-radius: 3px; transition: width .5s linear, background-color .5s linear; }
+  .core-bar i.warn { background: var(--amber); }
+  .core-bar i.bad  { background: var(--red); }
+  .core-l { font-size: 0.68rem; color: var(--ink-faint); margin-top: 5px; text-align: center; font-variant-numeric: tabular-nums; }
+
+  /* meters (memory + disk) */
+  .meter { height: 7px; border-radius: 4px; background: var(--line-soft); overflow: hidden; }
+  .meter i { display: block; height: 100%; border-radius: 4px; background: var(--green); transition: width .8s ease, background-color .8s ease; }
+  .meter i.warn { background: var(--amber); }
+  .meter i.bad  { background: var(--red); }
+
+  .disks { display: flex; flex-direction: column; gap: 15px; }
+  .disk-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .disk-m { font-size: 0.9rem; font-weight: 600; }
+  .disk-d { font-size: 0.72rem; color: var(--ink-faint); font-family: var(--mono); margin-left: 6px; }
+  .disk-s { font-size: 0.78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .disk-f { font-size: 0.72rem; color: var(--ink-faint); margin-top: 4px; font-variant-numeric: tabular-nums; }
+
+  .empty { color: var(--ink-faint); font-size: 0.85rem; padding: 16px; text-align: center; }
+  .foot { margin-top: 22px; font-size: 0.72rem; color: var(--ink-faint); text-align: center; }
+
+  @media (max-width: 860px) {
+    .charts { grid-template-columns: 1fr; }
+    .mem-grid { grid-template-columns: 1fr; }
+    .wrap { padding: 18px 13px 48px; }
+    .verdict { padding: 14px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+
+/* Tab pill. Switching tabs runs a view transition (spa.js starts it for its
+   in-place swap; a real page load uses the browser's own) that carries one shared
+   pill from the old tab to the new one, with a little spring and stretch on the
+   way. Only the pill and the three tab labels take part: the page itself is left
+   out (root has no name), so everything else still changes in one paint rather
+   than cross-fading. The pill is its own element behind the links, not the
+   current link's background, so the text never moves or squashes; each label
+   only fades between its plain and selected colour. Browsers without view
+   transitions, and anyone who asks for less motion, just switch. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+:root { view-transition-name:none; }
+:root::view-transition { pointer-events:none; }
+header.console .nav { position:relative; }
+.navpill { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none;
+  border-radius:999px; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55);
+  view-transition-name:navpill; }
+.navlink { position:relative; }
+.navlink[href="/"] { view-transition-name:nav-overview; }
+.navlink[href="/claude"] { view-transition-name:nav-claude; }
+.navlink[href="/hetzner"] { view-transition-name:nav-hetzner; }
+.navlink[href="/config"] { view-transition-name:nav-deploy; }
+.navlink[href="/builds"] { view-transition-name:nav-builds; }
+.nav.pilled .navlink.current { color:#fff; background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled .navlink.current:hover { color:#fff; background:transparent; box-shadow:none; }
+}
+/* Dragging the pill (nav.js): while a finger steers it, the labels go plain
+   except the one under the pill, the pill swells a touch and follows the finger
+   directly, then springs onto the tab it is let go over. A hovering mouse
+   steers it the same way, minus the swell. pan-y keeps vertical
+   swipes scrolling the page; only sideways ones move the pill. */
+.nav.pilled .navlink.current:active { color:#fff; background:transparent; box-shadow:none; transition-duration: 60ms; }
+header.console .nav { touch-action:pan-y; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.nav.pilled.steer .navlink { color:var(--ink-soft); background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled.steer .navlink:hover { color:var(--ink-soft); background:transparent; box-shadow:none; }
+}
+.nav.pilled.steer .navlink:active { color:var(--ink-soft); background:transparent; box-shadow:none; transition-duration: 60ms; }
+.nav.pilled.steer .navlink.over { color:#fff; }
+.nav.steer .navpill { transition:left .34s cubic-bezier(.3,1.3,.5,1), width .22s ease, scale .2s ease; }
+.nav.dragging .navpill { transition:width .22s ease, scale .2s ease; scale:1.07; }
+@media (prefers-reduced-motion: reduce) { .nav.steer .navpill { transition:none; } }
+::view-transition-group(navpill) { animation-duration:.55s;
+  animation-timing-function:linear(0, 0.062, 0.204, 0.377, 0.548, 0.7, 0.822, 0.913, 0.976, 1.016, 1.037, 1.045, 1.045, 1.04, 1.032, 1.024, 1.017, 1.01, 1.006, 1.002, 1); }
+/* While it moves, the pill is drawn fresh rather than as a stretched picture of
+   the old and new pill, which would warp its round ends and double its edge. */
+::view-transition-old(navpill), ::view-transition-new(navpill) { animation:none; opacity:0; }
+::view-transition-image-pair(navpill) { border-radius:999px; background:var(--green-solid);
+  box-shadow:0 3px 11px -2px rgba(19,185,112,.55); animation:navpill-stretch .55s cubic-bezier(.3,0,.3,1); }
+@keyframes navpill-stretch { 0%,100% { scale:1; } 35% { scale:1.08 .88; } }
+::view-transition-group(nav-overview), ::view-transition-group(nav-claude), ::view-transition-group(nav-deploy), ::view-transition-group(nav-builds) { animation-duration:.25s; }
+</style>
+
+<style>
+/* ============================================================
+   Fresh — a friendly, light "health app" look
+   Rounded display type, soft white cards, gentle shadows and a
+   cheerful green. Replaces the earlier dense terminal styling;
+   keeps every class name + DOM id the dashboard JS relies on.
+   ============================================================ */
+:root {
+  color-scheme:light;
+  --bg:#f3f7f4; --bg-2:#e9f0ec;
+  --panel:#ffffff; --panel-2:#f1f6f2;
+  --line:#e6ede8; --line-soft:#eef3f0;
+  --ink:#12241a; --ink-soft:#53625a; --ink-faint:#61706a;
+  --green:#0a8f52; --green-solid:#13b970; --green-bg:#e6f7ee;
+  --amber:#b06a08; --amber-solid:#f5a524; --amber-bg:#fdf1de;
+  --red:#d92d20;   --red-solid:#f04438;   --red-bg:#fdecea;
+  --blue:#2563eb;  --blue-solid:#3b82f6;  --blue-bg:#e9f1fe;
+  --signal:#0a8f52;
+  --display:ui-rounded,"SF Pro Rounded","Segoe UI Rounded",system-ui,sans-serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --r:18px;
+  --shadow:0 1px 2px rgba(18,40,28,.05), 0 8px 24px -12px rgba(18,40,28,.14);
+  --shadow-lift:0 2px 6px rgba(18,40,28,.06), 0 16px 32px -14px rgba(18,40,28,.20);
+}
+body {
+  background:
+    radial-gradient(900px 380px at 88% -120px, #e3f3ea, transparent 70%),
+    radial-gradient(760px 320px at 6% -80px, #eaf2fb, transparent 70%),
+    var(--bg);
+  color:var(--ink); font-family:var(--sans);
+}
+.wrap { max-width:1180px; padding:0 20px 84px; }
+
+/* ---- header ---- */
+header.console {
+  position:sticky; top:0; z-index:30;
+  margin:0 calc(50% - 50vw) 22px; padding:12px max(18px, calc(50vw - 560px));
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:#ffffff;
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+  border-bottom:1px solid var(--line);
+}
+header.console::after { display:none; }
+.wordmark { display:flex; align-items:center; gap:9px; text-decoration:none;
+  font-family:var(--display); font-size:1.06rem; font-weight:750; letter-spacing:-.01em; color:var(--ink); }
+.wordmark .mk { width:26px; height:26px; border-radius:9px; flex:none; position:relative;
+  background:linear-gradient(150deg,#1ccb7b,#0f9a5c); box-shadow:0 3px 9px rgba(19,185,112,.42); }
+.wordmark .mk::after { content:""; position:absolute; inset:0; margin:auto; width:9px; height:9px;
+  border-radius:50%; background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.4); }
+.wordmark span.dim { color:var(--ink-faint); font-weight:650; }
+@media (hover: hover) and (pointer: fine) {
+    .wordmark:hover span.dim { color:var(--ink-soft); }
+}
+header.console .host { color:var(--ink-faint); font-size:.78rem; font-family:var(--sans); }
+header.console .nav { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:auto; }
+.navlink { text-decoration:none; color:var(--ink-soft); font-size:.85rem; font-weight:600;
+  padding:7px 14px; border-radius:999px; border:none; white-space:nowrap;
+  transition:color .15s, background-color .15s, box-shadow .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink:hover { color:var(--ink); background:var(--panel-2); }
+}
+.navlink:active { color:var(--ink); background:var(--panel-2); transition-duration: 60ms; }
+.navlink.current { color:#fff; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55); }
+.navlink:focus-visible { outline:2px solid var(--green-solid); outline-offset:2px; }
+
+/* live pill — the stream-freshness badge. It lives in the Overview hero (the
+   verdict card), not the nav, so the header stays identical on every page and
+   nothing appears/disappears there when switching tabs. */
+#verdict { position:relative; }
+#verdict .pill { margin-left:auto; align-self:flex-start; }
+.pill { border:1px solid var(--line); background:var(--panel); color:var(--ink-soft);
+  border-radius:999px; padding:6px 13px 6px 10px; font-size:.76rem; font-weight:600; box-shadow:var(--shadow);
+  white-space:nowrap; }
+.pill .lamp { width:8px; height:8px; }
+.pill.live { color:var(--green); }
+.pill.live .lamp { background:var(--green-solid); box-shadow:0 0 0 3px rgba(19,185,112,.2);
+  animation:breathe 2.4s ease-in-out infinite; }
+.pill.stale { color:var(--amber); }
+.pill.stale .lamp { background:var(--amber-solid); box-shadow:none; animation:none; }
+@keyframes breathe { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(.78);opacity:.55} }
+
+/* ---- hero verdict ---- */
+.verdict { gap:18px; padding:22px 24px; align-items:center;
+  border:1px solid var(--line); border-left:1px solid var(--line);
+  border-radius:22px; background:var(--panel); box-shadow:var(--shadow); }
+.verdict .glyph { width:52px; height:52px; border-radius:16px; font-size:24px; font-weight:800; flex:none; }
+.verdict h2 { font-family:var(--display); font-size:1.4rem; font-weight:750; letter-spacing:-.02em; line-height:1.2; }
+.verdict p { color:var(--ink-soft); font-size:.9rem; margin-top:3px; }
+.verdict.ok   { background:linear-gradient(115deg,#ecfaf2,#ffffff 62%); border-color:#cdeeda; }
+.verdict.ok .glyph { background:var(--green-bg); color:var(--green); }
+.verdict.ok h2 { color:var(--green); }
+.verdict.warn { background:linear-gradient(115deg,#fdf4e6,#ffffff 62%); border-color:#f4e2c0; }
+.verdict.warn .glyph { background:var(--amber-bg); color:var(--amber); }
+.verdict.warn h2 { color:var(--amber); }
+.verdict.bad  { background:linear-gradient(115deg,#fdeeec,#ffffff 62%); border-color:#f6d3ce; }
+.verdict.bad .glyph { background:var(--red-bg); color:var(--red); }
+.verdict.bad h2 { color:var(--red); }
+.verdict.busy { background:linear-gradient(115deg,#ecf2fe,#ffffff 62%); border-color:#cfe0fb; }
+.verdict.busy .glyph { background:var(--blue-bg); color:var(--blue); }
+.verdict.busy h2 { color:var(--blue); }
+.verdict.idle .glyph { background:var(--panel-2); color:var(--ink-faint); }
+
+/* ---- KPI stat tiles ---- */
+.kpis { gap:12px; }
+.kpi { background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  padding:15px 16px 14px; box-shadow:var(--shadow); }
+.kpi .l { font-family:var(--sans); font-size:.77rem; font-weight:650; letter-spacing:0; text-transform:none;
+  color:var(--ink-faint); display:flex; align-items:center; gap:7px; }
+.kpi .l::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--green-solid); flex:none; }
+#kpi-mem  .l::before { background:#3b82f6; }
+#kpi-disk .l::before { background:#7c6cf0; }
+#kpi-load .l::before { background:#f5a524; }
+#kpi-up   .l::before { background:#0fb9b1; }
+.kpi .v { font-family:var(--display); font-size:1.7rem; font-weight:750; letter-spacing:-.02em;
+  color:var(--ink); margin-top:6px; font-variant-numeric:tabular-nums; }
+.kpi .v small { font-family:var(--display); font-size:.85rem; font-weight:650; color:var(--ink-faint); }
+.kpi .s { font-size:.75rem; color:var(--ink-faint); margin-top:1px; }
+.kpi.warn { border-color:#f0dcb0; } .kpi.warn .v { color:var(--amber); }
+.kpi.bad  { border-color:#f3cdc7; } .kpi.bad .v { color:var(--red); }
+
+/* ---- Claude usage strip ----
+   The two quota bars from the Claude tab, shrunk to one slim line under the
+   tiles: a glance at how much is left, not a second copy of that page. The
+   dot is the account's status (green, amber when warned, red when over). */
+.quota { display:flex; flex-wrap:wrap; align-items:center; gap:8px 36px; margin:-14px 0 26px;
+  padding:10px 16px; background:var(--panel); border:1px solid var(--line); border-radius:16px;
+  box-shadow:var(--shadow); color:var(--ink-faint); text-decoration:none; font-size:.78rem; }
+.quota[hidden] { display:none; }
+.quota .ql { font-weight:650; display:flex; align-items:center; gap:7px; white-space:nowrap; }
+.quota .ql::before { content:""; width:9px; height:9px; border-radius:50%; background:var(--green-solid); }
+.quota.warn .ql::before { background:var(--amber-solid); }
+.quota.bad  .ql::before { background:var(--red-solid); }
+/* Fixed columns, so the two bars line up even when one reset reads "2h 50m"
+   and the other "5d 8h". */
+.quota .qw { display:grid; grid-template-columns:3.6em 5.2em minmax(36px,1fr) 7.4em; align-items:center;
+  gap:8px; flex:1 1 280px; min-width:0; white-space:nowrap; }
+.quota .qw > span:last-child { text-align:right; }
+.quota .qw b { font-family:var(--display); font-weight:750; color:var(--ink); font-variant-numeric:tabular-nums; }
+.quota .qbar { flex:1; min-width:36px; height:6px; border-radius:3px; background:var(--line-soft); overflow:hidden; }
+.quota .qbar i { display:block; height:100%; width:0; border-radius:3px; background:var(--green-solid); }
+.quota .qbar i.y { background:var(--amber-solid); }
+.quota .qbar i.r { background:var(--red-solid); }
+
+/* ---- Releases strip ----
+   One line per push on its way to being live: the build and release on GitHub,
+   then the deploy here. The bar has a part for each leg, sized by how long that
+   leg usually takes for this service, so it reads as real progress. Shown only
+   while something is moving, and for a few minutes after it lands. */
+.pipes { margin:-14px 0 26px; padding:6px 16px; background:var(--panel); border:1px solid var(--line);
+  border-radius:16px; box-shadow:var(--shadow); font-size:.78rem; color:var(--ink-faint); }
+.pipes[hidden] { display:none; }
+.pipe { display:grid; grid-template-columns:9px minmax(0,1.3fr) minmax(0,1fr) minmax(90px,1.1fr) 9.4em;
+  grid-template-areas:"lamp name stage bar time"; align-items:center; gap:6px 12px; padding:8px 0;
+  color:inherit; text-decoration:none; }
+.pipe + .pipe { border-top:1px solid var(--line-soft); }
+.pipe .lamp { grid-area:lamp; }
+.pipe .pn { grid-area:name; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pipe .pn b { color:var(--ink); font-weight:650; margin-right:8px; }
+.pipe .pn .ico { display:inline-block; width:16px; height:16px; vertical-align:-3px; margin-right:7px; }
+.pipe .pn .ico[hidden] { display:none; }
+.pipe .ps { grid-area:stage; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pipe .pe { grid-area:time; text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.pipe .pe b { color:var(--ink); font-weight:650; }
+.pipe .pbar { grid-area:bar; display:flex; gap:2px; }
+.pipe .pbar > span { height:6px; border-radius:3px; background:var(--line-soft); overflow:hidden; min-width:12px; }
+.pipe .pbar i { display:block; height:100%; width:0; border-radius:3px; background:var(--blue);
+  transition:width 1s linear; }
+.pipe.live .pbar i { background:var(--green-solid); }
+.pipe.fail .pbar i { background:var(--red-solid); }
+.pipe.fail .ps { color:var(--red); }
+/* Instant hover line on the bar and the time — the browser's own tooltip waits ~1 s. */
+.pipe .pbar, .pipe .pe { position:relative; }
+.pipe [data-tip]::after { content:attr(data-tip); position:absolute; bottom:calc(100% + 6px); right:0;
+  padding:4px 8px; border-radius:6px; background:var(--panel-2); border:1px solid var(--line);
+  color:var(--ink); font-size:0.75rem; font-weight:550; white-space:nowrap; pointer-events:none;
+  box-shadow:0 4px 12px rgb(0 0 0 / .18); opacity:0; visibility:hidden; z-index:5; }
+@media (hover: hover) and (pointer: fine) {
+  .pipe [data-tip]:hover::after { opacity:1; visibility:visible; }
+}
+@media (prefers-reduced-motion: reduce) { .pipe .pbar i { transition:none; } }
+@media (max-width:560px) {
+  .pipe { grid-template-columns:9px minmax(0,1fr) auto;
+    grid-template-areas:"lamp name time" ". stage stage" ". bar bar"; }
+}
+
+/* ---- the level in the glass ----
+   The four measured tiles fill from the bottom like a glass, to the height of
+   the reading itself, so the row can be taken in at a glance without reading
+   four numbers first. Uptime has no percentage, so it stays plain.
+
+   The tint follows the tile's state — green normally, amber past 75%, red past
+   90% — so a tile that is filling up also changes colour rather than quietly
+   looking the same as a healthy one. */
+.kpi { position:relative; z-index:0; overflow:hidden; }
+/* Over the tint the faintest grey falls just under the 4.5:1 contrast line
+   (4.3 on green, 4.0 on red), so on these tiles the label and the small line
+   sit one shade darker — 4.6:1 at the worst point, on red at full tint. The
+   tint strength above was chosen the same way: measured, not guessed. */
+.kpi.filled .l, .kpi.filled .s { color:var(--ink-soft); }
+/* The level sits behind the tile's own text (a negative layer inside the tile's
+   stacking context), so the label, figure and small line stay ordinary flowing
+   text. The first version instead lifted each of those three onto its own layer
+   and hung a permanently moving, masked layer beside them; iOS Safari then
+   repainted a tile only over the area its *previous* text covered, so a line
+   that grew — "26d 12h" after "26d 9h" — came out chopped off halfway. Nothing
+   here is lifted onto a layer and nothing moves on its own. */
+.kpi .liquid {
+  position:absolute; left:0; right:0; bottom:0; height:0; z-index:-1; pointer-events:none;
+  overflow:hidden; border-radius:0 0 15px 15px;
+  --tint:19,185,112;
+  background:linear-gradient(180deg, rgba(var(--tint),.26), rgba(var(--tint),.12));
+  transition:height 1.2s cubic-bezier(.33,.9,.4,1);
+}
+.kpi.warn .liquid { --tint:245,165,36; }
+.kpi.bad  .liquid { --tint:240,68,56; }
+/* CPU is the one that genuinely moves between two readings a second apart, so
+   its level chases the number quickly; memory, disk and load drift slowly and
+   look better easing into place than twitching every second. */
+#kpi-cpu .liquid { transition-duration:.6s; }
+/* The surface is cut out of the top of the level in the tile's own colour, and
+   a fainter crest sits just below it for depth. Both live inside the level's
+   box, so a shallow level simply shows less of them. */
+.kpi .liquid::before {
+  content:""; position:absolute; left:0; top:0; width:100%; height:10px; z-index:2;
+  background:var(--panel);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 10' preserveAspectRatio='none'%3E%3Cpath d='M0,5 C 18,10 37,0 55,5 C 73,10 92,0 110,5 L110,0 L0,0 Z' fill='%23000'/%3E%3C/svg%3E") 0 0 / 110px 10px repeat-x;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 10' preserveAspectRatio='none'%3E%3Cpath d='M0,5 C 18,10 37,0 55,5 C 73,10 92,0 110,5 L110,0 L0,0 Z' fill='%23000'/%3E%3C/svg%3E") 0 0 / 110px 10px repeat-x;
+}
+.kpi .liquid::after {
+  content:""; position:absolute; left:0; top:9px; width:100%; height:10px; z-index:1;
+  background:rgba(var(--tint),.16);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 10' preserveAspectRatio='none'%3E%3Cpath d='M0,5 C 18,10 37,0 55,5 C 73,10 92,0 110,5 L110,10 L0,10 Z' fill='%23000'/%3E%3C/svg%3E") -34px 0 / 96px 10px repeat-x;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 110 10' preserveAspectRatio='none'%3E%3Cpath d='M0,5 C 18,10 37,0 55,5 C 73,10 92,0 110,5 L110,10 L0,10 Z' fill='%23000'/%3E%3C/svg%3E") -34px 0 / 96px 10px repeat-x;
+}
+@media (prefers-reduced-motion: reduce) {
+  .kpi .liquid { transition-duration:.2s; }
+}
+/* While the page scrolls, every bar jumps straight to its new size instead of
+   easing there. A bar easing its width or height makes the browser redo the
+   page layout on every frame — with the cores, meters, memory bars and tile
+   levels all updating each second that was ~50 layouts a second, and it made
+   scrolling stutter. Easing comes back a moment after scrolling stops. */
+body.scrolling .memseg, body.scrolling .split-bar i, body.scrolling .core-bar i,
+body.scrolling .meter i, body.scrolling .kpi .liquid { transition:none; }
+
+/* ---- section headers ---- */
+.sec-head { margin-bottom:13px; align-items:center; }
+h3 { font-family:var(--display); font-size:1.05rem; font-weight:700; letter-spacing:-.01em;
+  color:var(--ink); text-transform:none; display:block; }
+h3::before { display:none; }
+.sec-note { color:var(--ink-faint); font-size:.8rem; font-family:var(--sans); }
+
+/* ---- memory bar ---- */
+.membar { width:60px; min-height:240px; border-radius:12px; background:var(--line-soft); }
+.memseg:first-child { border-radius:12px 12px 0 0; } .memseg:last-child { border-radius:0 0 12px 12px; }
+.mem-legend { font-size:.79rem; }
+.mem-legend b { color:var(--ink); }
+.card-meta b, .split-legend b { color:var(--ink-soft); }
+
+/* ---- service cards ---- */
+.apps { gap:12px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:15px 16px;
+  box-shadow:var(--shadow); transition:transform .16s, box-shadow .16s, border-color .16s; }
+@media (hover: hover) and (pointer: fine) {
+    a.card:hover { transform:translateY(-2px); box-shadow:var(--shadow-lift); border-color:#cdeeda; }
+}
+a.card:active { transform:translateY(-2px); box-shadow:var(--shadow-lift); border-color:#cdeeda; transition-duration: 60ms; }
+.card.down { border-color:#f3cdc7; background:linear-gradient(120deg,#fdeeec,#fff 72%); }
+.card.busy { border-color:#cfe0fb; background:linear-gradient(120deg,#eef3fe,#fff 72%); }
+.card-name { font-family:var(--display); font-weight:700; font-size:1rem; }
+.card-up { display:none; font-family:var(--mono); color:var(--ink-faint); }
+.lamp { width:9px; height:9px; }
+.lamp.up   { background:var(--green-solid); box-shadow:0 0 0 3px rgba(19,185,112,.18); }
+.lamp.down { background:var(--red-solid);   box-shadow:0 0 0 3px rgba(240,68,56,.18); }
+.lamp.warn { background:var(--amber-solid);  box-shadow:0 0 0 3px rgba(245,165,36,.2); }
+.lamp.busy { background:var(--blue-solid);   box-shadow:0 0 0 3px rgba(59,130,246,.2); }
+.lamp.na   { background:var(--ink-faint); box-shadow:none; }
+
+/* status badges + load pills */
+.badge { border-radius:999px; font-weight:700; padding:3px 9px; }
+.badge.up { color:var(--green); background:var(--green-bg); }
+.badge.down { color:var(--red); background:var(--red-bg); }
+.badge.warn { color:var(--amber); background:var(--amber-bg); }
+.badge.busy { color:var(--blue); background:var(--blue-bg); }
+.badge.na { color:var(--ink-faint); background:var(--panel-2); }
+.load.calm { color:var(--ink-faint); background:var(--panel-2); }
+.load.light { color:var(--blue); background:var(--blue-bg); }
+.load.medium { color:var(--amber); background:var(--amber-bg); }
+.load.heavy { color:var(--red); background:var(--red-bg); }
+.card-ver .old { color:var(--amber); } .card-ver .new { color:var(--blue); }
+
+/* switched-off services, tucked into a collapsible subsection so a fleet that is
+   mostly stopped does not bury the handful that are live. */
+.offbox { margin-top:12px; }
+.offbar { display:flex; align-items:center; gap:8px; width:100%; padding:9px 12px;
+  background:var(--line-soft); border:1px solid var(--line); border-radius:12px;
+  font-family:var(--sans); font-size:.82rem; font-weight:650; color:var(--ink-soft);
+  cursor:pointer; text-align:left; transition:background .16s, border-color .16s; }
+@media (hover: hover) and (pointer: fine) {
+    .offbar:hover { background:var(--panel-2); border-color:#cdeeda; }
+}
+.offbar:active { background:var(--panel-2); border-color:#cdeeda; transition-duration: 60ms; }
+.offchev { display:inline-block; font-size:1.05rem; line-height:1; color:var(--ink-faint);
+  transition:transform .22s ease; }
+.offbar[aria-expanded="true"] .offchev { transform:rotate(90deg); }
+/* Height animation via the grid-rows trick — the inner wrapper clips while the
+   0fr→1fr row grows, so the cards below slide instead of snapping. */
+.offfold { display:grid; grid-template-rows:0fr; transition:grid-template-rows .28s ease; }
+.offbox.open .offfold { grid-template-rows:1fr; }
+.offfold-in { overflow:hidden; min-height:0; }
+.apps-off { padding:12px 6px 6px; }
+@media (prefers-reduced-motion: reduce) { .offfold { transition:none; } }
+
+/* meters + cores */
+.meter i { background:var(--green-solid); } .meter i.warn { background:var(--amber-solid); } .meter i.bad { background:var(--red-solid); }
+.core-bar i { background:var(--blue-solid); } .core-bar i.warn { background:var(--amber-solid); } .core-bar i.bad { background:var(--red-solid); }
+
+/* infra + resource panels */
+.infra { background:var(--line-soft); border:1px solid var(--line); border-radius:16px;
+  box-shadow:var(--shadow); overflow:hidden; }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
+.panel-head .t { font-family:var(--display); font-weight:700; letter-spacing:-.01em; text-transform:none;
+  font-size:.92rem; color:var(--ink); }
+.panel-head .v { font-family:var(--display); font-weight:700; font-variant-numeric:tabular-nums; }
+.foot { color:var(--ink-faint); font-family:var(--sans); font-size:.76rem; }
+
+@media (max-width:560px) {
+  header.console .host { display:none; }
+  header.console .nav { width:100%; margin-left:0; }
+  /* On phones the nav is a full-width left-aligned wrap. Rather than let the pill
+     sit in the tab row (where its width would shove the tabs) or take its own row
+     the four tabs, in the same place, on every page. */
+  .verdict { padding:18px; } .verdict .glyph { width:44px; height:44px; font-size:20px; }
+
+  /* Services: two square blocks per row. Each shows only the bare values —
+     name, status, version and how long it's been up. min-width:0 lets a long
+     single-word service name shrink instead of forcing the column (and the
+     page) wider than the screen. A tap expands the block to full width for the
+     memory, health and container breakdown. */
+  .apps { grid-template-columns:1fr 1fr; gap:10px; }
+  .card { cursor:pointer; min-width:0; overflow:hidden; }
+  .apps .card:not(.expanded) { display:flex; flex-direction:column;
+    gap:6px; padding:12px 13px; }
+  .card-top { gap:6px; min-width:0; }
+  /* The logo sits beside the status dot on the top row; the name has its own line. */
+  .card .ico { width:22px; height:22px; }
+  /* Put the lamp + status badge + chevron on a compact top row, and give the
+     name its own full-width line below so it reads in full (only the longest
+     names wrap, and then at the hyphen). */
+  /* The header row is the same open or closed, so expanding never jerks the name
+     or badge sideways — only the detail fold below moves. */
+  .apps .card .card-top { flex-wrap:wrap; row-gap:9px; }
+  .apps .card .card-top .badge { margin-left:auto; }
+  .apps .card .card-name { order:2; flex-basis:100%;
+    white-space:normal; overflow:visible; overflow-wrap:break-word;
+    line-height:1.2; font-size:.96rem; }
+  .card .badge { font-size:.56rem; padding:2px 6px; }
+  .card-top::after { content:"\203A"; padding-left:1px; color:var(--ink-faint);
+    font-weight:700; font-size:1rem; line-height:1; transition:transform .25s ease; }
+  .card.expanded .card-top::after { transform:rotate(90deg); }
+
+  /* The details (memory, health, container split) sit in a fold that animates its
+     own height via the grid 0fr↔1fr trick — a genuine height transition, so the
+     cards below slide instead of snapping — and fade in as it opens. */
+  .card-fold { display:grid; grid-template-rows:0fr;
+    transition:grid-template-rows .34s cubic-bezier(.4,0,.2,1); }
+  .card-fold-in { overflow:hidden; min-height:0; opacity:0;
+    transition:opacity .22s ease .06s; }
+  .apps .card:not(.expanded) .card-fold { margin-top:-6px; }  /* absorb the flex gap while closed */
+  .card.expanded .card-fold { grid-template-rows:1fr; }
+  .card.expanded .card-fold-in { opacity:1; }
+  @media (prefers-reduced-motion: reduce) {
+    .card-fold, .card-fold-in, .card-top::after { transition:none; }
+  }
+
+  .apps .card:not(.expanded) .card-ver:not([hidden]) { display:block; margin-top:auto;
+    font-size:.74rem; color:#4f6f9c; }
+  .apps .card:not(.expanded) .card-up { display:block; font-size:.74rem; font-weight:600;
+    color:var(--green); }
+  .card.expanded { grid-column:1 / -1; }
+  .card.expanded .card-ver:not([hidden]) { display:block; }
+
+  /* Memory & Storage are always open — there is no collapsing them.
+     On a phone the stacked bar already carries the proportions, so drop the mini
+     bars and lay the key out as plain name-left / value-right rows that fit the
+     narrow width without wrapping the value. */
+  #mem-section .mem-legend, #storage-section .mem-legend { display:grid; grid-template-columns:auto 1fr auto; flex:1; min-width:0; }
+  #mem-section .mem-legend .rail, #storage-section .mem-legend .rail { display:none; }
+}
+/* When the phone is set to dark: the same dashboard at night. Near-black green panels, light
+   ink, and the status colours lifted a shade so they read on dark. The service hues and the
+   charts' series colours are mid-tones that work on both, so they stay. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme:dark;
+    --bg:#0e1411; --bg-2:#131b17; --panel:#161e1a; --panel-2:#1c2621; --panel2:#1c2621;
+    --line:#26312b; --line-soft:#1f2924;
+    --ink:#e4ede7; --ink-soft:#a2b1a8; --soft:#a2b1a8; --ink-faint:#85948b; --faint:#85948b;
+    --green:#3fd08a; --green-bg:rgba(19,185,112,.15);
+    --amber:#f2b04f; --amber-bg:rgba(245,165,36,.15);
+    --red:#ff7a6e; --red-bg:rgba(240,68,56,.15);
+    --blue:#7aa7ff; --blue-bg:rgba(59,130,246,.16);
+    --pink:#e67fc0; --cyan:#3cc4b6; --signal:#3fd08a;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    --shadow-lift:0 2px 6px rgba(0,0,0,.35), 0 16px 32px -14px rgba(0,0,0,.7);
+  }
+  body { background:
+      radial-gradient(900px 380px at 88% -120px, rgba(19,185,112,.10), transparent 70%),
+      radial-gradient(760px 320px at 6% -80px, rgba(59,130,246,.08), transparent 70%),
+      var(--bg); }
+  header.console { background:#0e1411; }
+  .verdict.ok   { background:linear-gradient(115deg, rgba(19,185,112,.16), var(--panel) 62%); border-color:#1f4a34; }
+  .verdict.warn { background:linear-gradient(115deg, rgba(245,165,36,.16), var(--panel) 62%); border-color:#4d3c1c; }
+  .verdict.bad  { background:linear-gradient(115deg, rgba(240,68,56,.16), var(--panel) 62%); border-color:#55291f; }
+  .verdict.busy { background:linear-gradient(115deg, rgba(59,130,246,.16), var(--panel) 62%); border-color:#22365a; }
+  .kpi.warn { border-color:#4d3c1c; }
+  .kpi.bad  { border-color:#55291f; }
+  a.card:hover, a.card:active, .offbar:hover, .offbar:active { border-color:#1f4a34; }
+  .card.down { border-color:#55291f; background:linear-gradient(120deg, rgba(240,68,56,.14), var(--panel) 72%); }
+  .card.busy { border-color:#22365a; background:linear-gradient(120deg, rgba(59,130,246,.14), var(--panel) 72%); }
+  .apps .card:not(.expanded) .card-ver:not([hidden]) { color:#8fb0dc; }
+}
+/* Five tabs fit on one line on a phone only with tighter spacing. */
+@media (max-width:560px){ header.console .nav{ flex-wrap:nowrap; gap:0; justify-content:space-between; }
+  .navlink{ padding:7px 7px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="console">
+    <a class="wordmark" href="/"><span class="mk"></span>osmosis&nbsp;<span class="dim">health</span></a>
+    <div class="nav">
+      <span class="navpill" aria-hidden="true"></span>
+      <a class="navlink current" href="/">Overview</a>
+      <a class="navlink" href="/claude">Claude</a>
+      <a class="navlink" href="/hetzner">Hetzner</a>
+      <a class="navlink" href="/config">Deploy</a>
+      <a class="navlink" href="/builds">Builds</a>
+    <script>navPill(); // the tab pill — see nav.js</script>
+    </div>
+  </header>
+
+  <div class="verdict idle" id="verdict" role="status" aria-live="polite">
+    <div class="glyph" id="verdict-glyph">•</div>
+    <div>
+      <h2 id="verdict-title">Waiting for the first reading…</h2>
+      <p id="verdict-sub">Connecting to the metrics stream.</p>
+    </div>
+    <span class="pill" id="conn"><span class="lamp na"></span><span id="conn-text">connecting…</span></span>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi filled" id="kpi-cpu">
+      <div class="liquid" id="fill-cpu"></div>
+      <div class="l">CPU</div>
+      <div class="v num"><span id="k-cpu">—</span><small>%</small></div>
+      <div class="s" id="k-cpu-sub">—</div>
+    </div>
+    <div class="kpi filled" id="kpi-mem">
+      <div class="liquid" id="fill-mem"></div>
+      <div class="l">Memory</div>
+      <div class="v num"><span id="k-mem">—</span><small>%</small></div>
+      <div class="s" id="k-mem-sub">—</div>
+    </div>
+    <div class="kpi filled" id="kpi-disk">
+      <div class="liquid" id="fill-disk"></div>
+      <div class="l">Disk</div>
+      <div class="v num"><span id="k-disk">—</span><small>%</small></div>
+      <div class="s" id="k-disk-sub">—</div>
+    </div>
+    <div class="kpi filled" id="kpi-load">
+      <div class="liquid" id="fill-load"></div>
+      <div class="l">Load</div>
+      <div class="v num" id="k-load">—</div>
+      <div class="s" id="k-load-sub">—</div>
+    </div>
+    <div class="kpi" id="kpi-up">
+      <div class="l">Uptime</div>
+      <div class="v num" id="k-up">—</div>
+      <div class="s" id="k-up-sub">—</div>
+    </div>
+  </div>
+
+  <a class="quota" id="quota" href="/claude" hidden>
+    <span class="ql">Claude usage</span>
+    <span class="qw" id="q-5h">5-hour <b></b><span class="qbar"><i></i></span><span></span></span>
+    <span class="qw" id="q-7d">Weekly <b></b><span class="qbar"><i></i></span><span></span></span>
+  </a>
+
+  <section class="pipes" id="pipes" hidden aria-label="Releases in progress"></section>
+
+  <div class="mem-grid">
+  <section id="mem-section">
+    <div class="sec-head">
+      <h3>Memory</h3>
+      <span class="sec-note" id="mem-note"></span>
+    </div>
+    <div class="mem-row">
+      <div class="mem-legend" id="mem-legend"></div>
+      <div class="membar" id="membar"></div>
+    </div>
+  </section>
+
+  <section id="storage-section">
+    <div class="sec-head">
+      <h3>Storage</h3>
+      <span class="sec-note" id="storage-note"></span>
+    </div>
+    <div class="mem-row">
+      <div class="membar" id="storagebar"></div>
+      <div class="mem-legend" id="storage-legend"></div>
+    </div>
+  </section>
+  </div>
+
+  <section>
+    <div class="sec-head">
+      <h3>Services</h3>
+      <span class="sec-note" id="apps-note"></span>
+    </div>
+    <div class="apps" id="apps"><div class="empty">Loading…</div></div>
+    <div class="offbox" id="offbox" hidden>
+      <button type="button" class="offbar" id="offbar" aria-expanded="false" aria-controls="apps-off">
+        <span class="offchev" aria-hidden="true">›</span>
+        <span class="offlabel" id="offlabel"></span>
+      </button>
+      <div class="offfold"><div class="offfold-in">
+        <div class="apps apps-off" id="apps-off"></div>
+      </div></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h3>Infrastructure</h3>
+      <span class="sec-note">Keeps the VPS serving</span>
+    </div>
+    <div class="infra" id="infra"></div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <h3>Resources</h3>
+      <span class="sec-note">Last 60 seconds</span>
+    </div>
+    <div class="charts">
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="t">CPU</span>
+          <span class="v num"><span id="cpu-val">—</span><small>%</small></span>
+        </div>
+        <div class="chart"><canvas id="cpu-chart"></canvas></div>
+        <div class="cores-wrap"><span class="cores-label">Cores</span><div class="cores" id="cores"></div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="t"><span class="tname">CPU by service</span><small> · 10-second average</small></span>
+          <span class="v num" title="All services added up, same scale as CPU — a 10-second average, so it lags a spike."><span id="svccpu-val">—</span><small>%</small></span>
+        </div>
+        <div class="chart"><canvas id="svccpu-chart"></canvas></div>
+        <div class="svc-key" id="svccpu-legend"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="t">Memory</span>
+          <span class="v num"><span id="mem-val">—</span><small id="mem-of"></small></span>
+        </div>
+        <div class="chart"><canvas id="mem-chart"></canvas></div>
+        <div class="meter" style="margin-top:10px"><i id="mem-bar" style="width:0%"></i></div>
+        <div class="legend">
+          <span><i style="background:#f0883e"></i>Used <b id="l-used">—</b></span>
+          <span><i style="background:#16a34a"></i>Cached <b id="l-cached">—</b></span>
+          <span><i style="background:#8b7cf6"></i>Buffers <b id="l-buf">—</b></span>
+          <span id="l-swap-wrap" hidden>Swap <b id="l-swap">—</b></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="t">Network</span>
+          <span class="v num" id="net-val">—</span>
+        </div>
+        <div class="chart"><canvas id="net-chart"></canvas></div>
+        <div class="legend" id="net-legend"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <p class="foot" id="foot">—</p>
+</div>
+
+<script>
+"use strict";
+
+const WINDOW = 60;                       // samples kept per series (1/s → one minute)
+const $ = (id) => document.getElementById(id);
+// Phones show services as two compact blocks per row and the memory legend
+// collapsed; a tap expands them. Wider screens are untouched (cards stay links).
+const isNarrow = () => window.matchMedia('(max-width: 560px)').matches;
+
+/* ── formatting ─────────────────────────────────────────── */
+const fmt1 = (n) => (Math.round(n * 10) / 10).toFixed(1);
+const fmtInt = (n) => Math.round(n).toLocaleString();
+
+function fmtBytesMB(mb) {                // memory: MB in, human out
+  if (mb >= 1024) return (mb / 1024).toFixed(1) + ' GB';
+  return Math.round(mb) + ' MB';
+}
+function fmtGB(gb) {
+  if (gb >= 1000) return (gb / 1000).toFixed(2) + ' TB';
+  if (gb >= 1) return gb.toFixed(1) + ' GB';
+  return Math.round(gb * 1024) + ' MB';
+}
+// Storage is reported in bytes; scale to the unit that reads cleanly (decimal, to
+// match df and the disk KPI).
+function fmtBytes(b) {
+  if (b >= 1e9) return (b / 1e9).toFixed(1) + ' GB';
+  if (b >= 1e6) return Math.round(b / 1e6) + ' MB';
+  if (b >= 1e3) return Math.round(b / 1e3) + ' KB';
+  return Math.round(b) + ' B';
+}
+// The VPS idles at a few KB/s, which reads as a flat "0.0 MB/s" — scale the unit
+// to the traffic instead of forcing everything into megabytes.
+function fmtRate(mbs) {
+  const kbs = mbs * 1024;
+  if (kbs < 1) return Math.round(kbs * 1024) + ' B/s';
+  if (kbs < 1024) return (kbs < 10 ? kbs.toFixed(1) : Math.round(kbs)) + ' KB/s';
+  return fmt1(mbs) + ' MB/s';
+}
+// A service's CPU, as its share of the whole VPS. One decimal while the number is
+// small, because the difference between a service idling at 0.1% and one quietly
+// burning 3% is the entire reason to show it; whole numbers once it is big enough
+// that the decimal is just noise.
+function fmtPct(p) {
+  if (!p || p < 0.05) return '0%';
+  if (p < 10) return p.toFixed(1) + '%';
+  return Math.round(p) + '%';
+}
+function fmtDuration(sec) {
+  if (!sec || sec < 0) return '—';
+  const d = Math.floor(sec / 86400);
+  const h = Math.floor((sec % 86400) / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m`;
+  return `${Math.floor(sec)}s`;
+}
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const level = (pct) => pct >= 90 ? 'bad' : pct >= 75 ? 'warn' : '';
+
+// Fill a stat tile to its reading. Load can pass 100% — more work queued than
+// cores to run it — and a glass cannot be more than full, so it stops there;
+// the number above it still tells the true story. Rounded to whole percent so a
+// reading that jitters in its second decimal does not restart the animation
+// every second.
+function setFill(id, pct) {
+  const el = $(id);
+  if (el) setStyle(el, 'height', Math.max(0, Math.min(100, Math.round(pct))) + '%');
+}
+
+// Is the machine getting busier or quieter? The one-minute load against the
+// fifteen-minute one answers that; the deadband and the floor keep an idle VPS
+// from flapping between "climbing" and "easing off" on a rounding difference.
+function loadTrend(load1, load15) {
+  const base = Math.max(load15, 0.25);
+  const change = (load1 - load15) / base;
+  if (change > 0.35) return 'climbing';
+  if (change < -0.35) return 'easing off';
+  return 'steady';
+}
+
+/* ── writing to the DOM ─────────────────────────────────────
+   setText, setClass, setHidden, setHTML, setStyle, setAttr, h and syncList all
+   live in /dom.js now, shared with the Claude and Deploy tabs, which repaint on
+   their own timers and had the same problem. Nothing here changed; the comments
+   explaining why each write is guarded moved with them.                        */
+
+/* ── series + canvas charts ─────────────────────────────────
+   Prefilled with nulls so the newest sample always sits on the right edge and
+   history drains off the left, instead of a line that grows out of the corner.
+   Hand-drawn on a canvas: a health page should not need a CDN to render.      */
+const series = () => new Array(WINDOW).fill(null);
+function push(arr, v) { arr.push(v); if (arr.length > WINDOW) arr.shift(); }
+
+// The chart grid and axis labels follow the phone's light or dark setting.
+const DARK = matchMedia('(prefers-color-scheme: dark)');
+const gridColour = () => DARK.matches ? '#26312b' : '#e9ede9';
+const axisColour = () => DARK.matches ? '#6f7e75' : '#9aa79f';
+
+/* The parts every chart here has in common: a canvas sized for the screen's pixel
+   density, a plot area, and the horizontal grid with its labels. Hands back the
+   two functions that turn a sample into a point, so the chart itself only has to
+   say what shape to draw. Returns null when the canvas has no size yet — a panel
+   on a tab that has not been looked at. */
+function chartFrame(canvas, opts) {
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight;
+  if (!w || !h) return null;
+  if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+  }
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  const padL = opts.padL ?? 44, padR = 2, padT = 6, padB = 4;
+  const plotW = w - padL - padR, plotH = h - padT - padB;
+  if (plotW <= 0 || plotH <= 0) return null;
+
+  const max = Math.max(opts.max, 1e-9);
+  const x = (i) => padL + (plotW * i) / (WINDOW - 1);
+  const y = (v) => padT + plotH * (1 - Math.min(v, max) / max);
+
+  // horizontal grid + labels
+  ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++) {
+    const v = (max * t) / ticks;
+    const yy = Math.round(y(v)) + 0.5;
+    ctx.strokeStyle = gridColour();
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(padL, yy);
+    ctx.lineTo(w - padR, yy);
+    ctx.stroke();
+    if (t % 2 === 0) {
+      ctx.fillStyle = axisColour();
+      ctx.fillText(opts.tick(v), padL - 7, yy);
+    }
+  }
+
+  return { ctx, x, y, padT, plotH };
+}
+
+function drawChart(canvas, opts) {
+  const f = chartFrame(canvas, opts);
+  if (!f) return;
+  const { ctx, x, y, padT, plotH } = f;
+
+  for (const s of opts.series) {
+    const data = s.data;
+
+    if (s.fill) {
+      const g = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+      g.addColorStop(0, s.fill);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      let started = false, firstX = 0, lastX = 0;
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] == null) continue;
+        if (!started) { firstX = x(i); ctx.moveTo(x(i), y(data[i])); started = true; }
+        else ctx.lineTo(x(i), y(data[i]));
+        lastX = x(i);
+      }
+      if (started) {
+        ctx.lineTo(lastX, padT + plotH);
+        ctx.lineTo(firstX, padT + plotH);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.width ?? 2;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.setLineDash(s.dash || []);
+    ctx.beginPath();
+    let pen = false;
+    for (let i = 0; i < data.length; i++) {
+      if (data[i] == null) { pen = false; continue; }
+      if (!pen) { ctx.moveTo(x(i), y(data[i])); pen = true; }
+      else ctx.lineTo(x(i), y(data[i]));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // head dot: makes "now" unmistakable on a line that is otherwise all history
+    const lastIdx = data.length - 1;
+    if (data[lastIdx] != null) {
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.arc(x(lastIdx), y(data[lastIdx]), 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+/* Bands stacked on top of each other, each one sitting on the running total of
+   the bands below it, so the height of the whole stack is what the VPS is doing
+   and each ribbon is one service's share of it.
+
+   `from` is where the history actually starts. The bands are drawn as solid
+   ribbons rather than lines, so a gap cannot be left blank the way a line chart
+   leaves it — without this the empty part of the minute before the page was
+   opened would be drawn as a confident flat zero. */
+function drawStack(canvas, opts) {
+  const f = chartFrame(canvas, opts);
+  if (!f) return;
+  const { ctx, x, y } = f;
+  const from = opts.from || 0;
+  if (from >= WINDOW - 1) return;
+
+  // Each band's top, as a running total of everything at or below it.
+  const tops = [];
+  const below = new Array(WINDOW).fill(0);
+  for (const b of opts.bands) {
+    for (let i = 0; i < WINDOW; i++) below[i] += Math.max(0, b.data[i] ?? 0);
+    tops.push(below.slice());
+  }
+  const floor = new Array(WINDOW).fill(0);
+  const ribbon = (top, under) => {
+    ctx.beginPath();
+    for (let i = from; i < WINDOW; i++) ctx[i === from ? 'moveTo' : 'lineTo'](x(i), y(top[i]));
+    for (let i = WINDOW - 1; i >= from; i--) ctx.lineTo(x(i), y(under[i]));
+    ctx.closePath();
+  };
+
+  opts.bands.forEach((b, k) => {
+    ribbon(tops[k], k ? tops[k - 1] : floor);
+    ctx.fillStyle = resolveColour(b.colour);
+    ctx.fill();
+  });
+
+  /* A hairline in the panel's own colour between one band and the next, so two
+     of them meeting still read apart — the same 2px gap the memory bar puts
+     between its slices, drawn rather than left empty.
+
+     Only between two bands that are actually thick enough to be seen. Most
+     services idle at a fraction of a percent, which is well under a pixel on
+     this scale: separating those would draw a line across a band that is not
+     there, and erase the one below it. */
+  const thick = tops.map((top, k) => {
+    const under = k ? tops[k - 1] : floor;
+    let most = 0;
+    for (let i = from; i < WINDOW; i++) most = Math.max(most, y(under[i]) - y(top[i]));
+    return most >= 3;
+  });
+  ctx.strokeStyle = resolveColour('var(--panel)');
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  for (let k = 1; k < opts.bands.length; k++) {
+    if (!thick[k] || !thick[k - 1]) continue;
+    ctx.beginPath();
+    for (let i = from; i < WINDOW; i++) ctx[i === from ? 'moveTo' : 'lineTo'](x(i), y(tops[k - 1][i]));
+    ctx.stroke();
+  }
+}
+
+/* Canvas cannot read a CSS variable, so the service colours — which live in the
+   stylesheet, where the bar and the legend get them — are looked up once and
+   remembered. None of them moves with the colour scheme today; the listener is
+   there so the cache is not the reason that cannot change. */
+const resolvedColours = new Map();
+function resolveColour(c) {
+  const v = /^var\((--[\w-]+)\)$/.exec(c);
+  if (!v) return c;
+  if (!resolvedColours.has(c)) {
+    resolvedColours.set(c, getComputedStyle(document.documentElement).getPropertyValue(v[1]).trim() || '#8b949e');
+  }
+  return resolvedColours.get(c);
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => resolvedColours.clear());
+
+/* ── data ───────────────────────────────────────────────── */
+const cpuData = series();
+const memUsed = series(), memCached = series(), memBuffers = series();
+const netRx = {}, netTx = {};
+let memTotal = 1, netMax = 0.05;
+
+/* Which service is burning the CPU, over the same minute as the chart beside it.
+   One band per service, in the colour it already has on the memory bar, so a
+   swatch means the same thing everywhere on this page.
+
+   Two things here differ from the CPU chart next door, both on purpose:
+   • Services are read every ten seconds, not every second, so a band is a
+     ten-second average — a one-second spike shows up next door and is smoothed
+     out here.
+   • The scale follows the tallest stack in view instead of standing at 100%.
+     The VPS mostly idles at a few percent, and a fixed axis would draw every
+     service as a flat line along the floor.                                   */
+const svcCPU = new Map();   // service name -> its last 60 readings
+let svcCPUBands = [];       // what the chart draws, bottom band first
+let svcCPUSamples = 0;      // how much of the minute we have actually seen
+let svcCPUMax = 5;
+
+const charts = [];
+function redraw() { charts.forEach(fn => fn()); }
+
+charts.push(() => drawChart($('cpu-chart'), {
+  max: 100,
+  tick: (v) => Math.round(v) + '%',
+  series: [{ data: cpuData, color: '#16b364', width: 2, fill: 'rgba(16,179,100,.16)' }],
+}));
+
+charts.push(() => drawStack($('svccpu-chart'), {
+  max: svcCPUMax,
+  // Under a few percent the whole chart lives in the first tick, so the labels
+  // need the decimal to say anything at all.
+  tick: (v) => (svcCPUMax <= 5 ? v.toFixed(1) : Math.round(v)) + '%',
+  bands: svcCPUBands,
+  from: Math.max(0, WINDOW - svcCPUSamples),
+}));
+
+charts.push(() => drawChart($('mem-chart'), {
+  max: memTotal,
+  tick: (v) => (memTotal >= 2048 ? (v / 1024).toFixed(1) + 'G' : Math.round(v) + 'M'),
+  series: [
+    { data: memUsed,    color: '#f0883e', width: 2,   fill: 'rgba(240,136,62,.15)' },
+    { data: memCached,  color: '#16a34a', width: 1.5 },
+    { data: memBuffers, color: '#8b7cf6', width: 1.5, dash: [3, 3] },
+  ],
+}));
+
+charts.push(() => {
+  const s = [];
+  Object.keys(netRx).forEach((iface) => {
+    s.push({ data: netRx[iface], color: '#16a34a', width: 2, fill: 'rgba(22,163,74,.14)' });
+    s.push({ data: netTx[iface], color: '#2f6fed', width: 1.5, dash: [4, 3] });
+  });
+  drawChart($('net-chart'), { max: netMax, tick: (v) => fmtRate(v).replace('/s', ''), series: s, padL: 54 });
+});
+
+/* ── services ───────────────────────────────────────────── */
+let deployInfo = {};   // name -> release info, only when signed in
+
+// Five different things can look like "not up", and conflating them is how a
+// dashboard cries wolf:
+//   off       — the unit is disabled; it is not running because you said so
+//   unknown   — systemd could not be asked; we do not know anything
+//   deploying — the deployer is restarting it right now; it is down on purpose
+//   down      — systemd says it is stopped or failed. This is the real alarm.
+//   sick      — running, but its own HTTP endpoint will not answer.
+//
+// A deploy stops the unit and swaps the artifact under it, so mid-deploy it reads
+// as inactive and its health check refuses connections — indistinguishable from a
+// crash, if you only look at systemd. Hence the flag from the deployer, and hence
+// down and sick check it: everything downstream (cards, sort order, the verdict,
+// the tab title) asks those two, so this is the only place it has to be said.
+const isOff       = (s) => !!s.unit && !s.enabled && s.state !== 'active';
+const isDeploying = (s) => !!s.deploying;
+const isUnknown   = (s) => !!s.unit && s.state === 'unknown';
+const isDown      = (s) => !!s.unit && !isOff(s) && !isDeploying(s) && (s.state === 'inactive' || s.state === 'failed');
+const isSick      = (s) => !isDeploying(s) && s.state === 'active' && s.has_health && !s.http_ok;
+// A service with no systemd unit has no process for us to introspect, so there is
+// nothing for us to report as down — which is exactly how the deployer scores it
+// too (no unit, no health ⇒ up). Two flavours: a served static site (has a public
+// URL, e.g. osmosis-index) and an externally-managed agent (no URL, e.g. qa-agent,
+// driven by its own control script). Neither should render in the grey "off" state
+// and read as disabled next to a switched-off service.
+const isUnitless  = (s) => !s.unit;
+const isStaticSite = (s) => isUnitless(s) && !!s.url;
+const isUp        = (s) => isUnitless(s) || (s.active && (!s.has_health || s.http_ok));
+const needsHelp   = (s) => isDown(s) || isSick(s);
+
+// Switched-off services sink to the bottom, live ones rise — then within each
+// group, heaviest first. A down-but-enabled service still floats to the top of
+// the live group (trouble) so a health view never buries it mid-list, but a
+// disabled service is always below every live one no matter what.
+//
+// The memory is rounded to 10 MB before it is compared. Sorting on a live figure
+// means the order is itself live, and two services a few MB apart would trade
+// places on every poll — cards jumping around under the cursor, and every moved
+// node restarting its CSS animation. Rounding makes the order change only when
+// something actually changes.
+const offRank = (s) => isOff(s) ? 1 : 0;
+const trouble = (s) => isDown(s) ? 0 : isSick(s) ? 1 : isUnknown(s) ? 2 : 3;
+const heft = (s) => Math.round((s.mem_mb || 0) / 10);
+const byEnabledThenMemory = (a, b) =>
+  offRank(a) - offRank(b) ||
+  trouble(a) - trouble(b) ||
+  heft(b) - heft(a) ||
+  serviceLabel(a.name).localeCompare(serviceLabel(b.name));
+
+function svcLamp(s) {
+  if (isDeploying(s)) return 'busy';
+  if (isDown(s)) return 'down';
+  if (isSick(s) || isUnknown(s) || s.state === 'activating') return 'warn';
+  if (isUp(s)) return 'up';
+  return 'na';
+}
+// The badge is a class and a word rather than a blob of HTML, so it can be
+// written into a node that is already there instead of replacing it.
+function svcBadge(s) {
+  if (isDeploying(s)) return ['busy', 'Deploying'];
+  if (isDown(s)) return ['down', 'Down'];
+  if (isOff(s)) return ['na', 'Off'];
+  if (isUnknown(s)) return ['warn', 'Unknown'];
+  if (s.state === 'activating') return ['warn', 'Starting'];
+  if (isSick(s)) return ['warn', 'Not answering'];
+  // Serving, but say what it is: a static site rather than a running process.
+  if (isStaticSite(s)) return ['up', 'Static'];
+  if (isUp(s)) return ['up', 'Up'];
+  return ['na', '—'];
+}
+
+/* ── service colours ─────────────────────────────────────
+   A colour belongs to a service, not to a position in the list. If it were
+   assigned by rank, a service overtaking another would repaint them both and
+   the swatch you learned five seconds ago would now mean something else. So a
+   service claims a slot the first time it is seen and keeps it. */
+const SLOTS = ['var(--svc-1)',  'var(--svc-2)',  'var(--svc-3)',  'var(--svc-4)',
+               'var(--svc-5)',  'var(--svc-6)',  'var(--svc-7)',  'var(--svc-8)',
+               'var(--svc-9)',  'var(--svc-10)', 'var(--svc-11)', 'var(--svc-12)',
+               'var(--svc-13)', 'var(--svc-14)'];
+const REST = 'var(--svc-rest)';
+const svcColour = new Map();   // name -> colour, for the life of the page
+
+function colourFor(name) {
+  return svcColour.get(name) || REST;
+}
+
+// Every service that shows up anywhere gets a colour of its own. There are more
+// colours than services, so in practice nothing is ever left over — but the
+// order slots are handed out in still matters, because it decides who keeps a
+// colour and who falls back to grey if that ever stops being true.
+//
+// Memory used to decide this on its own, which meant a service that worked the
+// processor hard while holding almost no memory had no colour to be drawn in.
+// Both now count: the heaviest few in memory claim first, because they are the
+// ones the memory bar draws as visible blocks, then whatever is busiest, then
+// everybody else.
+const MEM_FIRST = 6;
+
+function assignColours(services) {
+  // Let a slot go when its service does. Without this, deleting a service (as
+  // timer-service was once) would leave its colour permanently claimed and the
+  // next service along would be stuck with the grey fallback.
+  const live = new Set(services.map(s => s.name));
+  for (const name of svcColour.keys()) {
+    if (!live.has(name)) svcColour.delete(name);
+  }
+
+  const claim = (list) => {
+    for (const s of list) {
+      if (svcColour.has(s.name)) continue;
+      const taken = new Set(svcColour.values());
+      const free = SLOTS.find(c => !taken.has(c));
+      if (free) svcColour.set(s.name, free);
+    }
+  };
+
+  const byMem = services.filter(s => s.mem_mb > 0).sort((a, b) => b.mem_mb - a.mem_mb);
+  const byCPU = services.filter(s => s.cpu_pct > 0).sort((a, b) => b.cpu_pct - a.cpu_pct);
+  claim(byMem.slice(0, MEM_FIRST));
+  claim(byCPU);
+  claim(byMem);
+}
+
+/* The memory and storage bars are the same drawing over different units — one
+   carries megabytes, the other bytes — so both read their size through here. */
+const segVal = x => (x.mb !== undefined ? x.mb : x.bytes);
+
+// The stacked bar: one div per slice, sized by flex-grow so the stack divides
+// whatever height the row settles at. Patched rather than rebuilt, which also
+// lets the CSS transition on flex-grow actually run — a rebuilt div starts at
+// its final size and animates nothing.
+function syncBar(host, segs, total, fmt) {
+  syncList(host, segs.map(x => ({ key: x.label, x })),
+    () => h('div'),
+    (el, { x }) => {
+      const v = segVal(x);
+      setClass(el, 'memseg' + (x.hatch ? ' hatch' : ''));
+      setStyle(el, 'flexGrow', String(v));
+      setStyle(el, 'flexShrink', '0');
+      setStyle(el, 'flexBasis', '0%');
+      setStyle(el, 'backgroundColor', x.colour);
+      setAttr(el, 'title', `${x.label} — ${fmt(v)} (${(100 * v / total).toFixed(1)}%)`);
+    });
+}
+
+// The ranked key beside the bar: a swatch, the label, a mini bar scaled to the
+// largest slice, and the figure. `display:contents` on the row wrapper keeps the
+// four cells in the legend's own grid, so grouping the row costs no layout.
+function syncLegend(host, primary, tail, fmt) {
+  const segs = [...primary, ...tail];
+  const max = Math.max(...segs.map(segVal), 1);
+  const items = [
+    ...primary.map(x => ({ key: 'r:' + x.label, x })),
+    ...(primary.length ? [{ key: 'divider' }] : []),
+    ...tail.map(x => ({ key: 'r:' + x.label, x })),
+  ];
+  syncList(host, items,
+    (it) => {
+      if (!it.x) return h('div', 'legend-div');
+      const row = h('div', 'lrow');
+      const rail = h('span', 'rail');
+      rail.appendChild(h('i'));
+      row.append(h('i', 'sw'), h('span', 'lbl'), rail, h('b'));
+      return row;
+    },
+    (el, it) => {
+      const x = it.x;
+      if (!x) return;
+      const [sw, lbl, rail, val] = el.children;
+      const hat = x.hatch ? ' hatch' : '';
+      const v = segVal(x);
+      setClass(sw, 'sw' + hat);
+      setStyle(sw, 'backgroundColor', x.colour);
+      setText(lbl, x.label);
+      setAttr(lbl, 'title', x.title || x.label);
+      const fill = rail.firstChild;
+      setClass(fill, hat.trim());
+      setStyle(fill, 'width', Math.max(2, 100 * v / max).toFixed(1) + '%');
+      setStyle(fill, 'backgroundColor', x.colour);
+      setText(val, fmt(v));
+    });
+}
+
+function renderMemBar(d) {
+  const total = d.mem.total_mb;
+  if (!total) return;
+
+  assignColours(d.services || []);
+  const services = (d.services || []).filter(s => s.mem_mb > 0);
+  const sorted = [...services].sort((a, b) => b.mem_mb - a.mem_mb);
+
+  const named = sorted.filter(s => svcColour.has(s.name));
+  const rest  = sorted.filter(s => !svcColour.has(s.name));
+  const restMB = rest.reduce((a, s) => a + s.mem_mb, 0);
+
+  const cache = d.mem.cached_mb + d.mem.buffers_mb;
+  const free = d.mem.free_mb;
+  // Whatever is left is the rest of the VPS: the OS, postgres, dockerd, the
+  // kernel. Naming it honestly beats quietly folding it into a service.
+  const other = Math.max(0, total - free - cache - sorted.reduce((a, s) => a + s.mem_mb, 0));
+
+  const segs = [
+    ...named.map(s => ({ label: serviceLabel(s.name), mb: s.mem_mb, colour: colourFor(s.name) })),
+    // Only if there were ever more services than there are colours — every one
+    // of them is named in its own right now, so this normally has nothing in it
+    // and drops out below.
+    { label: rest.length === 1 ? rest[0].name : `${rest.length} other services`,
+      mb: restMB, colour: REST, sys: true },
+    { label: 'Everything else', title: 'Everything else running on the VPS — the OS, postgres, dockerd, the kernel', mb: other, colour: 'var(--sys)', sys: true },
+    { label: 'Cached (reclaimable)', title: 'Cached files — yours back the moment you ask, at the cost of a disk read', mb: cache, colour: 'var(--free)', hatch: true, sys: true },
+    { label: 'Free', mb: free, colour: 'var(--free)', sys: true },
+  ].filter(x => x.mb > 0);
+
+  // Bar is drawn top-down in reverse of the ranked order, so free/cache (green)
+  // sit at the top and the biggest service anchors the bottom.
+  syncBar($('membar'), [...segs].reverse(), total, fmtBytesMB);
+
+  // An unstacked, ranked read of the bar: one row per slice with a mini bar scaled
+  // to the largest slice, so rank is obvious. Named services first, then a divider,
+  // then the slices that are not a service at all (system / cache / free).
+  const svcSegs = segs.filter(x => !x.sys), sysSegs = segs.filter(x => x.sys);
+  syncLegend($('mem-legend'), svcSegs, sysSegs, fmtBytesMB);
+
+  // Cache is reclaimable, so it doesn't count as "used" here — used is what the
+  // apps and the OS actually hold: total minus free minus cache.
+  setText($('mem-note'), `${fmtBytesMB(Math.max(0, total - free - cache))} used of ${fmtBytesMB(total)}`);
+}
+
+/* The bands the CPU-by-service chart draws, rebuilt from the frame that just
+   arrived. One band per service that used any processor time in the minute on
+   screen — each named, none of them added together into an anonymous heap.
+
+   The axis climbs through these, so a busy minute is drawn against a round
+   number rather than against itself. Every one of them halves into a round
+   number too, because the label halfway up the chart is drawn from exactly
+   that — a top of 75% would put "38%" in the middle of the axis. */
+const CPU_STEPS = [2, 5, 10, 20, 40, 60, 80, 100];
+
+function renderServiceCPU(services) {
+  // A service that has gone — renamed, or dropped from the deployer — takes its
+  // history with it, so the chart cannot go on drawing a band for something
+  // that no longer exists.
+  const live = new Set(services.map(s => s.name));
+  for (const name of svcCPU.keys()) if (!live.has(name)) svcCPU.delete(name);
+  for (const s of services) {
+    if (!svcCPU.has(s.name)) svcCPU.set(s.name, series());
+    push(svcCPU.get(s.name), s.cpu_pct || 0);
+  }
+  svcCPUSamples = Math.min(WINDOW, svcCPUSamples + 1);
+
+  const peak = (data) => data.reduce((m, v) => (v != null && v > m ? v : m), 0);
+  const now = (data) => data[data.length - 1] || 0;
+
+  // Stacked bottom-up in order of the highest each one reached in the minute on
+  // screen, not of what it is doing this second. Ordering on the live figure
+  // would let two similar services trade places every few seconds, and every
+  // swap drags every band above it up and down with it — a stack that looks
+  // like it is churning while nothing has actually changed. Rounded first, for
+  // the same reason the service cards round their memory before sorting on it.
+  const named = [], rest = [];
+  for (const [name, data] of svcCPU) {
+    if (peak(data) <= 0) continue;
+    (svcColour.has(name) ? named : rest).push({ name, data });
+  }
+  named.sort((a, b) => Math.round(peak(b.data) * 10) - Math.round(peak(a.data) * 10)
+                    || serviceLabel(a.name).localeCompare(serviceLabel(b.name)));
+
+  const bands = named.map(b => ({
+    key: b.name, label: serviceLabel(b.name), colour: colourFor(b.name), data: b.data, now: now(b.data),
+    peak: peak(b.data),
+  }));
+
+  // There are more colours than services, so this is normally empty. It only
+  // fills if the VPS ever grows past fourteen of them, and then it says how many
+  // and which of them is busiest rather than going quiet about it.
+  if (rest.length) {
+    const data = new Array(WINDOW).fill(0);
+    for (const r of rest) for (let i = 0; i < WINDOW; i++) data[i] += r.data[i] || 0;
+    const busiest = [...rest].sort((a, b) => now(b.data) - now(a.data)).slice(0, 3)
+      .map(r => `${r.name} ${fmtPct(now(r.data))}`).join(', ');
+    bands.push({
+      key: '__rest', label: `${rest.length} other services`, colour: REST,
+      data, now: now(data), peak: peak(data),
+      title: busiest ? 'Busiest right now: ' + busiest : '',
+    });
+  }
+  svcCPUBands = bands;
+
+  let tallest = 0;
+  for (let i = 0; i < WINDOW; i++) {
+    let stack = 0;
+    for (const b of bands) stack += b.data[i] || 0;
+    if (stack > tallest) tallest = stack;
+  }
+  svcCPUMax = CPU_STEPS.find(n => n >= tallest * 1.15) || 100;
+
+  // The headline is every service added up, including the ones folded into the
+  // grey band and the ones too small to have made it into the chart at all.
+  setText($('svccpu-val'), fmt1(services.reduce((a, s) => a + (s.cpu_pct || 0), 0)));
+
+  // The key: the same services in the same order as the bands they name, one to
+  // a row, so the figures read down a column instead of being scattered along a
+  // wrapped line.
+  syncList($('svccpu-legend'), bands,
+    () => { const el = h('div', 'krow'); el.append(h('i'), h('span', 'lbl'), h('b')); return el; },
+    (el, it) => {
+      const [sw, lbl, val] = el.children;
+      // A service that did nothing all minute still keeps its row — one that came
+      // and went would shove every row beside it sideways every ten seconds — but
+      // it steps back so the eye lands on whatever is actually working.
+      setClass(el, 'krow' + (it.peak < 0.05 ? ' quiet' : ''));
+      setStyle(sw, 'background', it.colour);
+      setText(lbl, it.label);
+      setAttr(el, 'title', it.title || `${it.label} — ${fmtPct(it.now)} of the VPS,` +
+                                       ` up to ${fmtPct(it.peak)} in the last minute`);
+      setText(val, fmtPct(it.now));
+    });
+}
+
+/* ── storage (root filesystem, by category) ─────────────────
+   Same shape as the memory bar: a stacked bar of where the disk goes, plus a
+   ranked key. Categories group by purpose, not by directory, because the space
+   for one concern is scattered across roots (apps in /opt, the dev container in
+   /var/lib/docker, the OS in /usr). Colours are assigned per category name. */
+const STORAGE_COLOURS = {
+  'Workspace & containers': '#58a6ff',
+  'Applications':           '#7d8fd6',
+  'System & OS':            '#656c76',
+  'Admin & scratch':        '#f0883e',
+  'Databases':              '#f778ba',
+  'Logs':                   '#39c5cf',
+};
+const STORAGE_OTHER = '#8b949e';
+
+function renderStorageBar(d) {
+  const s = d.storage;
+  // du runs a few seconds after boot and then every 15 min; until the first scan
+  // lands there is nothing to draw.
+  if (!s || !s.total_bytes) { setText($('storage-note'), 'measuring…'); return; }
+  const total = s.total_bytes;
+
+  const segs = [
+    ...(s.categories || []).map(c => ({ label: c.name, bytes: c.bytes, colour: STORAGE_COLOURS[c.name] || STORAGE_OTHER })),
+    { label: 'Other', title: 'Used space no category claimed — the package DB, apt lists, and other bits of /var', bytes: s.other_bytes, colour: STORAGE_OTHER, sys: true },
+    { label: 'Free', bytes: s.free_bytes, colour: 'var(--free)', sys: true },
+  ].filter(x => x.bytes > 0);
+
+  // Reversed so Free (green) sits at the top, biggest category at the bottom.
+  syncBar($('storagebar'), [...segs].reverse(), total, fmtBytes);
+
+  // A ranked read of the same bar (mini bars scaled to the largest slice), with a
+  // divider between the real categories and the Other/Free tail.
+  const catSegs = segs.filter(x => !x.sys), tailSegs = segs.filter(x => x.sys);
+  syncLegend($('storage-legend'), catSegs, tailSegs, fmtBytes);
+
+  setText($('storage-note'), `${fmtBytes(s.used_bytes)} used of ${fmtBytes(total)}`);
+}
+
+/* ── what is inside a container ──────────────────────────
+   The workspace is the largest thing on this page every time you load it, and one
+   number for "three Claude sessions and whatever they started" only ever says "it
+   is big" — never "a Gradle daemon has been sitting on 650 MB since lunch".
+
+   The parts are drawn in tints of the service's own colour, so the strip reads as
+   that slice of the bar above, opened up — rather than as five new services that
+   just appeared. Tints descend with size, which makes the ramp itself the
+   ordering, and spends no new hues: past about eight, hues stop being telling
+   apart under colour blindness, and those are already spent on the bar. */
+const TINTS = [100, 74, 56, 42, 32, 24];
+
+function tint(colour, i) {
+  if (i === 0) return colour;
+  // Mixed toward the same neutral that means "everything else": same hue, quieter.
+  return `color-mix(in oklab, ${colour} ${TINTS[i] ?? 18}%, var(--sys))`;
+}
+
+function renderSplit(el, s) {
+  const parts = s.breakdown || [];
+  const total = parts.reduce((a, p) => a + p.mem_mb, 0);
+  setHidden(el, !total);
+  if (!total) return;
+
+  // The kernel's own memory is not a program and never gets the app's colour.
+  const base = colourFor(s.name);
+  const colour = (p, i) => p.name.startsWith('Kernel') ? 'var(--sys)' : tint(base, i);
+  const pct = p => (100 * p.mem_mb / total).toFixed(2);
+
+  setHTML(el, `<div class="split-bar">${parts.map((p, i) =>
+      `<i style="width:${pct(p)}%;background:${colour(p, i)}"
+          title="${esc(p.name)} — ${fmtBytesMB(p.mem_mb)}"></i>`).join('')}</div>
+    <div class="split-legend">${parts.map((p, i) =>
+      `<span><i class="sw" style="background:${colour(p, i)}"></i>${esc(p.name)}${
+        p.count > 1 ? ` <em>×${p.count}</em>` : ''} <b>${fmtBytesMB(p.mem_mb)}</b></span>`).join('')}</div>`);
+}
+
+// Point the icon at this service and let it appear only if it actually loads.
+// Starting hidden and revealing on load means a missing icon leaves no broken
+// image and no gap where one used to be.
+
+// The memory-load pill, shown on every card that has a cgroup to read so the
+// current level is always visible — calm included, just styled quiet. Absent only
+// when there is no pressure to read at all (a static site, or a kernel without
+// per-cgroup PSI). The word is graded on the server (calm/light/medium/heavy);
+// the tooltip carries the PSI numbers it was graded from.
+function metaItems(s) {
+  const items = [];
+  const p = s.mem_pressure;
+  if (p) {
+    items.push({ key: 'load', kind: 'load', level: p.level,
+      title: p.level === 'calm'
+        ? 'memory load calm — not waiting on memory'
+        : `memory load — stalled ${p.some.toFixed(0)}% of the last 60s` +
+          (p.full >= 1 ? ` (fully ${p.full.toFixed(0)}%)` : '') });
+  }
+  if (s.uptime_sec) items.push({ key: 'up', kind: 'up', val: fmtDuration(s.uptime_sec) });
+  if (s.mem_mb) {
+    // Against its own limit, when it has one: 400 MB is roomy for one service and
+    // the edge of a throttle-and-thrash for the next. This is the number that was
+    // missing when vesteda sat above its MemoryHigh for days.
+    const pct = s.mem_max_mb ? 100 * s.mem_mb / s.mem_max_mb : 0;
+    items.push({ key: 'mem', kind: 'mem',
+      cls: pct >= 90 ? 'bad' : pct >= 75 ? 'warn' : '',
+      colour: colourFor(s.name),
+      val: fmtBytesMB(s.mem_mb),
+      cap: s.mem_max_mb ? ` of ${fmtBytesMB(s.mem_max_mb)}` : '' });
+    // CPU sits on the same rows as memory, for the same reason: both come from the
+    // cgroup, so a row with one has the other. Shown even at 0%, rather than
+    // appearing only when busy — an item that comes and goes shifts everything
+    // beside it every ten seconds, and "this service is idle" is worth stating.
+    //
+    // Deliberately not colour-graded. A service using CPU is a service doing work,
+    // not a fault, and the workspace sits near 40% of the VPS all day by design;
+    // painting that red would cry wolf on the normal state of this machine. The
+    // alarm belongs to the overall figure at the top of the page.
+    items.push({ key: 'cpu', kind: 'cpu', val: fmtPct(s.cpu_pct),
+      title: `${(s.cpu_pct || 0).toFixed(1)}% of the whole VPS, all cores together` });
+  }
+  if (s.oom_kills)  items.push({ key: 'oom', html: `<b class="bad">${s.oom_kills}</b> OOM ${s.oom_kills === 1 ? 'kill' : 'kills'}` });
+  if (s.restarts)   items.push({ key: 'restarts', html: `<b>${s.restarts}</b> restarts` });
+  if (isStaticSite(s)) items.push({ key: 'static', html: 'static site' });
+  if (isOff(s))     items.push({ key: 'off', html: 'auto-start <b>disabled</b>' });
+  // Mid-deploy the health check fails because the unit is stopped on purpose;
+  // reporting that as "health failing" states a symptom of nothing.
+  if (s.has_health && !isDeploying(s)) items.push({ key: 'health', html: s.http_ok ? 'health <b>ok</b>' : 'health <b>failing</b>' });
+  return items;
+}
+
+/* The meta line under a card name. Uptime and the memory figure move on every
+   frame while the rest of the line does not, so each item owns its element and
+   only the ticking numbers get written. The separators between items are keyed
+   too, so adding or dropping an item does not disturb the ones around it. */
+function syncMeta(host, s) {
+  // Separators are elements, not a CSS ::before: as their own flex items they
+  // wrap the way they always did, instead of a dot being dragged to the start of
+  // a wrapped line. Keying each one to the item it precedes keeps them stable.
+  const items = [];
+  for (const it of metaItems(s)) {
+    if (it.kind !== 'load' && items.length && items[items.length - 1].kind !== 'load') {
+      items.push({ key: 'sep:' + it.key, sep: true });
+    }
+    items.push(it);
+  }
+  syncList(host, items,
+    (it) => {
+      if (it.sep) { const e = h('span', 'sep'); e.textContent = '·'; return e; }
+      if (it.kind === 'load') return h('span');
+      const el = h('span', 'mi');
+      if (it.kind === 'up') el.append(document.createTextNode('up '), h('b'));
+      else if (it.kind === 'mem') el.append(h('i', 'sw'), document.createTextNode(' '), h('b'), h('span', 'cap'));
+      else if (it.kind === 'cpu') el.append(h('b'), document.createTextNode(' cpu'));
+      return el;
+    },
+    (el, it) => {
+      if (it.sep) return;
+      if (it.kind === 'load') {
+        setClass(el, 'load ' + it.level);
+        setAttr(el, 'title', it.title);
+        setText(el, it.level);
+      } else if (it.kind === 'up') {
+        setText(el.children[0], it.val);
+      } else if (it.kind === 'cpu') {
+        setText(el.children[0], it.val);
+        setAttr(el, 'title', it.title);
+      } else if (it.kind === 'mem') {
+        setStyle(el.children[0], 'background', it.colour);
+        setClass(el.children[1], it.cls);
+        setText(el.children[1], it.val);
+        setText(el.children[2], it.cap);
+      } else {
+        setHTML(el, it.html);
+      }
+    });
+}
+
+function svcVer(s) {
+  const d = deployInfo[s.name] || {};
+  const stale = d.tag && d.latest && !d.up_to_date;
+  // The incoming tag rides on the public feed, so the version being installed
+  // shows even when signed out — unlike d.tag, which needs a session.
+  if (isDeploying(s) && s.deploy_tag) {
+    return `${d.tag ? `${esc(d.tag)} → ` : ''}<span class="new">${esc(s.deploy_tag)}</span>`;
+  }
+  if (!d.tag) return '';
+  return stale ? `<span class="old">${esc(d.tag)}</span> → ${esc(d.latest)}` : esc(d.tag);
+}
+
+// Cards live across frames, keyed by service name, and get patched. Rebuilding
+// the grid every second is what made the page impossible to read: it wiped any
+// selection, dropped hover, and restarted the deploying lamp's pulse mid-blink.
+const appCards = new Map();     // live service name -> card element
+const offAppCards = new Map();  // switched-off service name -> card element
+const infraRows = new Map();    // service name -> row element
+
+// A card is an <a> when there is somewhere to go and a <div> when there is not,
+// so the element itself is remade only if that ever changes.
+//
+// The parts are resolved once, here, and kept: the state classes we write later
+// collide with the structural ones. A healthy lamp is class "lamp up", so asking
+// a built row for ".up" finds the lamp rather than the uptime — which is exactly
+// how the uptime ended up rendered inside the lamp.
+function shell(s, cls, inner, store, refs) {
+  let el = store.get(s.name);
+  const want = s.url ? 'A' : 'DIV';
+  if (el && el.tagName !== want) { el.remove(); el = null; }
+  if (!el) {
+    el = document.createElement(want === 'A' ? 'a' : 'div');
+    el.className = cls;
+    if (s.url) { el.href = s.url; el.target = '_blank'; el.rel = 'noopener'; }
+    el.innerHTML = inner;
+    el._parts = {};
+    for (const [key, sel] of Object.entries(refs)) el._parts[key] = el.querySelector(sel);
+    store.set(s.name, el);
+  }
+  return el;
+}
+
+function appCard(s, store) {
+  return shell(s, 'card', `
+    <div class="card-top">
+      <span class="lamp"></span>
+      <img class="ico" alt="" hidden>
+      <span class="card-name"></span>
+      <span class="badge"></span>
+      <button type="button" class="gh" hidden title="View source on GitHub" aria-label="View source on GitHub"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></button>
+    </div>
+    <div class="card-fold"><div class="card-fold-in">
+      <div class="card-meta"></div>
+      <div class="split" hidden></div>
+    </div></div>
+    <div class="card-ver"></div>
+    <div class="card-up"></div>`,
+    store,
+    { lamp: '.lamp', ico: '.ico', name: '.card-name', badge: '.badge', gh: '.gh', meta: '.card-meta',
+      split: '.split', ver: '.card-ver', up: '.card-up' });
+}
+
+function infraRow(s) {
+  return shell(s, 'irow', `
+    <span class="lamp"></span>
+    <img class="ico" alt="" hidden>
+    <span class="nm"></span>
+    <span class="up"></span>`,
+    infraRows,
+    { lamp: '.lamp', ico: '.ico', name: '.nm', note: '.up' });
+}
+
+// Put the children in the given order, touching the DOM only where it is already
+// wrong, and drop the ones that no longer exist. Moving a node restarts its CSS
+// animations, so a pulsing "deploying" lamp must not be re-inserted on a frame
+// that changed nothing about it.
+function place(parent, els, store) {
+  els.forEach((el, i) => {
+    if (parent.children[i] !== el) parent.insertBefore(el, parent.children[i] || null);
+  });
+  for (const [name, el] of store) {
+    if (!els.includes(el)) { el.remove(); store.delete(name); }
+  }
+}
+
+// Build and refresh one service card, patching the reused element in `store`.
+function fillCard(s, store) {
+  const card = appCard(s, store);
+  const p = card._parts;
+  // On phones a tap expands the block; bind once (the element is reused across
+  // frames). preventDefault only fires on narrow screens, so on desktop the
+  // card keeps working as a link to the service.
+  if (!card._tapBound) {
+    card._tapBound = true;
+    card.addEventListener('click', (e) => {
+      if (!isNarrow()) return;
+      e.preventDefault();
+      card.setAttribute('aria-expanded', card.classList.toggle('expanded') ? 'true' : 'false');
+    });
+  }
+  const [badgeCls, badgeText] = svcBadge(s);
+  // Keep the expanded state across the per-second re-render: setClass rewrites
+  // the whole className, which would otherwise drop the tapped-open state.
+  const openCls = card.classList.contains('expanded') ? ' expanded' : '';
+  setClass(card, 'card' + (isDeploying(s) ? ' busy' : isDown(s) ? ' down' : '') + openCls);
+  setClass(p.lamp, 'lamp ' + svcLamp(s));
+  setIcon(p.ico, s.name);
+  setText(p.name, serviceLabel(s.name));
+  p.name.title = s.name;   // the card is narrow; the name may be cut short
+  setClass(p.badge, 'badge ' + badgeCls);
+  setText(p.badge, badgeText);
+  // A small GitHub mark links to the service's repo. It sits inside the card
+  // (which is itself a link to the running service), so the click must be caught
+  // and stopped from opening the service too.
+  setHidden(p.gh, !s.repo);
+  if (s.repo) {
+    p.gh.dataset.repo = s.repo;
+    if (!p.gh._bound) {
+      p.gh._bound = true;
+      p.gh.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open('https://github.com/' + p.gh.dataset.repo, '_blank', 'noopener');
+      });
+    }
+  }
+  syncMeta(p.meta, s);
+  renderSplit(p.split, s);
+
+  const verHTML = svcVer(s);
+  setHTML(p.ver, verHTML);
+  setHidden(p.ver, !verHTML);   // an empty version line must not take its margin
+
+  // How long it has been up — i.e. running since its last (re)start or deploy.
+  // Shown as a bare value on the compact mobile block; hidden on desktop.
+  setText(p.up, s.uptime_sec ? 'up ' + fmtDuration(s.uptime_sec) : '');
+  setHidden(p.up, !s.uptime_sec);
+  return card;
+}
+
+function renderApps(services) {
+  const apps = services.filter(s => s.group === 'app');
+  const el = $('apps');
+  if (!apps.length) {
+    setHTML(el, '<div class="empty">No services configured.</div>');
+    appCards.clear();
+    setHidden($('offbox'), true);
+    return;
+  }
+  el.querySelector('.empty')?.remove();
+
+  // Heaviest first — on a VPS this tight, "what is eating the RAM" is the question
+  // you come here to answer. But anything broken still outranks it: a down service
+  // reports 0 MB, so sorting on memory alone would bury the one thing you must see.
+  apps.sort(byEnabledThenMemory);
+
+  // Switched-off services go under a collapsed subsection so a mostly-stopped
+  // fleet does not crowd out the handful that are live.
+  const live = apps.filter(s => !isOff(s));
+  const off  = apps.filter(isOff);
+
+  place(el, live.map(s => fillCard(s, appCards)), appCards);
+  if (live.length === 0) setHTML(el, '<div class="empty">All services are switched off.</div>');
+
+  place($('apps-off'), off.map(s => fillCard(s, offAppCards)), offAppCards);
+  setHidden($('offbox'), off.length === 0);
+  setText($('offlabel'), `${off.length} switched off`);
+  bindOffToggle();
+
+  // "Healthy" counts only the live services that are actually up — never the
+  // switched-off ones (they moved to their own subsection). Trouble first.
+  const down = live.filter(needsHelp).length;
+  const busy = live.filter(isDeploying).length;
+  const healthy = live.filter(isUp).length;
+  setText($('apps-note'), down
+    ? `${down} ${down === 1 ? 'needs' : 'need'} attention`
+    : busy
+    ? `${busy} deploying`
+    : `${healthy} healthy`);
+}
+
+// The switched-off subsection expands on click. The open state lives on the
+// static #offbox element, so it survives the per-second re-render on its own.
+function bindOffToggle() {
+  const bar = $('offbar');
+  if (!bar || bar._bound) return;
+  bar._bound = true;
+  bar.addEventListener('click', () => {
+    const open = $('offbox').classList.toggle('open');
+    bar.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+}
+
+function renderInfra(services) {
+  const infra = services.filter(s => s.group === 'infra').sort(byEnabledThenMemory);
+  const rows = infra.map(s => {
+    const row = infraRow(s);
+    const p = row._parts;
+    setClass(p.lamp, 'lamp ' + svcLamp(s));
+    setIcon(p.ico, s.name);
+    setText(p.name, serviceLabel(s.name));
+    // Show the memory these are now ordered by, carrying the same swatch as its
+    // slice of the bar. An order whose key is invisible just reads as arbitrary;
+    // uptime only fills in when there is no reading to show.
+    // The figure ticks every second; give it its own text node so the swatch
+    // beside it is not thrown away and rebuilt along with it.
+    if (!p.note._sw) {
+      p.note.textContent = '';
+      p.note._sw = h('i', 'sw');
+      p.note._txt = document.createTextNode('');
+      p.note.append(p.note._sw, p.note._txt);
+    }
+    setHidden(p.note._sw, !s.mem_mb);
+    if (s.mem_mb) setStyle(p.note._sw, 'background', colourFor(s.name));
+    // These rows are one line each and stay that way; CPU joins the note only when
+    // there is something to say. Infrastructure is idle almost always, so a
+    // permanent "0% cpu" on four rows would be four rows of noise — but the build
+    // watchdog starts a Claude session when master breaks, and that is exactly the
+    // spike worth seeing without opening anything.
+    const cpuTxt = s.cpu_pct >= 1 ? ` · ${fmtPct(s.cpu_pct)} cpu` : '';
+    const noteTxt = (s.mem_mb ? ' ' + fmtBytesMB(s.mem_mb)
+      : isDown(s) ? 'down'
+      : isOff(s) ? 'off'
+      : isUnknown(s) ? 'unknown'
+      : s.note ? s.note
+      : s.uptime_sec ? fmtDuration(s.uptime_sec)
+      : '—') + cpuTxt;
+    if (p.note._txt.nodeValue !== noteTxt) p.note._txt.nodeValue = noteTxt;
+    setClass(row, noteTxt.length > 24 ? 'irow long' : 'irow');
+    return row;
+  });
+  place($('infra'), rows, infraRows);
+}
+
+/* ── verdict ────────────────────────────────────────────── */
+function renderVerdict(d) {
+  const svcs = d.services || [];
+  const broken = svcs.filter(needsHelp);
+  const unknown = svcs.filter(isUnknown);
+  const off = svcs.filter(isOff);
+  const busy = svcs.filter(isDeploying);
+  const memPct = d.mem.total_mb > 0 ? 100 * d.mem.used_mb / d.mem.total_mb : 0;
+  const fullDisk = (d.disks || []).filter(x => x.used_pct >= 90);
+
+  const v = $('verdict');
+  let cls, glyph, title, sub;
+
+  if (broken.length) {
+    cls = 'bad'; glyph = '!';
+    title = `${broken.length} service${broken.length > 1 ? 's' : ''} need${broken.length > 1 ? '' : 's'} attention`;
+    // Naming every one of them turns a headline into a paragraph; name a few and
+    // let the cards below carry the rest.
+    const named = broken.slice(0, 3).map(s => `${s.name} — ${isDown(s) ? (s.state || 'down') : 'not answering'}`);
+    if (broken.length > named.length) named.push(`and ${broken.length - named.length} more`);
+    sub = named.join(' · ');
+  } else if (unknown.length) {
+    cls = 'warn'; glyph = '?';
+    title = `Cannot read ${unknown.length} service${unknown.length > 1 ? 's' : ''}`;
+    sub = `systemd did not answer for ${unknown.map(s => serviceLabel(s.name)).join(', ')}`;
+  } else if (fullDisk.length || memPct >= 95) {
+    cls = 'warn'; glyph = '!';
+    title = 'Running low on room';
+    sub = fullDisk.length
+      ? fullDisk.map(x => `${x.mount} is ${fmt1(x.used_pct)}% full`).join(' · ')
+      : `memory is ${fmt1(memPct)}% used`;
+  // A deploy is not a warning — but saying "all systems operational" while a
+  // service is visibly stopped reads as a dashboard that has not noticed.
+  } else if (busy.length) {
+    cls = 'busy'; glyph = '↻';
+    title = busy.length === 1 ? `Deploying ${busy[0].name}` : `Deploying ${busy.length} services`;
+    sub = busy.map(s => s.deploy_tag ? `${serviceLabel(s.name)} → ${s.deploy_tag}` : serviceLabel(s.name)).join(' · ');
+  } else {
+    cls = 'ok'; glyph = '✓';
+    title = 'All systems operational';
+    // No subline when everything is fine: the counts it recited are all visible
+    // a few hundred pixels below (Services lists every one, with its state), and
+    // host uptime is on the host card. "All systems operational" says it already.
+    sub = '';
+  }
+
+  setClass(v, 'verdict ' + cls);
+  setText($('verdict-glyph'), glyph);
+  setText($('verdict-title'), title);
+  setText($('verdict-sub'), sub);
+  // An empty <p> still occupies its line-height and margin, which leaves the
+  // healthy card looking bottom-heavy — take it out of flow entirely.
+  const vsub = $('verdict-sub');
+  if (vsub) vsub.style.display = sub ? '' : 'none';
+
+  const docTitle = broken.length ? `(${broken.length}) Health` : 'Health';
+  if (document.title !== docTitle) document.title = docTitle;
+}
+
+/* ── KPIs ───────────────────────────────────────────────── */
+function renderKPIs(d) {
+  const memPct = d.mem.total_mb > 0 ? 100 * d.mem.used_mb / d.mem.total_mb : 0;
+  const disks = d.disks || [];
+  const worst = disks.reduce((a, b) => (b.used_pct > (a?.used_pct ?? -1) ? b : a), null);
+  const cores = d.host.cores || 1;
+  const loadPct = 100 * d.host.load1 / cores;
+
+  setText($('k-cpu'), fmt1(d.cpu.overall));
+  setText($('k-cpu-sub'), `${cores} core${cores === 1 ? '' : 's'}`);
+  setClass($('kpi-cpu'), 'kpi filled ' + level(d.cpu.overall));
+  setFill('fill-cpu', d.cpu.overall);
+
+  setText($('k-mem'), fmt1(memPct));
+  setText($('k-mem-sub'), `${fmtBytesMB(d.mem.used_mb)} of ${fmtBytesMB(d.mem.total_mb)}`);
+  setClass($('kpi-mem'), 'kpi filled ' + level(memPct));
+  setFill('fill-mem', memPct);
+
+  if (worst) {
+    setText($('k-disk'), fmt1(worst.used_pct));
+    // Naming the mount only earns its place when there is more than one disk to
+    // tell apart; on a single-filesystem host "on /" is noise.
+    setText($('k-disk-sub'),
+      `${fmtGB(worst.free_gb)} free` + (disks.length > 1 ? ` on ${worst.mount}` : ''));
+    setClass($('kpi-disk'), 'kpi filled ' + level(worst.used_pct));
+    setFill('fill-disk', worst.used_pct);
+  }
+
+  // Load average has no unit: it counts the processes running or waiting for a
+  // CPU (and, on Linux, waiting on disk). A bare "0.4" says nothing on its own —
+  // it only means something against the number of cores there are to run on, and
+  // 0.4 is idle here but would be a queue on a single-core machine. So show the
+  // ceiling next to it, which is also the number the amber/red thresholds use.
+  const kl = $('k-load');
+  if (!kl._n) { kl.textContent = ''; kl._n = document.createTextNode(''); kl._s = h('small'); kl.append(kl._n, kl._s); }
+  const l1 = fmt1(d.host.load1);
+  if (kl._n.nodeValue !== l1) kl._n.nodeValue = l1;
+  setText(kl._s, ` of ${cores}`);
+  // The small line has been through two goes at this. It used to read
+  // "3% of 4 cores · 0.2 · 0.2 (5m · 15m)", then "9% busy · 5 min 0.3 · 15 min
+  // 0.2" — but a labelled load average is still a load average, and that means
+  // nothing to anyone who has not met one before. So the two averages are no
+  // longer printed as numbers at all: their only real job is to say whether the
+  // machine is getting busier or quieter, and that is now said in a word. The
+  // figures themselves are one hover away.
+  const trend = loadTrend(d.host.load1, d.host.load15);
+  setText($('k-load-sub'), `${Math.round(loadPct)}% of capacity, ${trend}`);
+  setAttr($('kpi-load'), 'title',
+    `Jobs waiting on a core, over ${cores}: now ${fmt1(d.host.load1)}, `
+    + `5 min ${fmt1(d.host.load5)}, 15 min ${fmt1(d.host.load15)}.`);
+  setClass($('kpi-load'), 'kpi filled ' + level(loadPct));
+  setFill('fill-load', loadPct);
+
+  setText($('k-up'), fmtDuration(d.host.uptime_sec));
+  setText($('k-up-sub'), d.host.kernel || '');
+}
+
+/* ── per-core strip ─────────────────────────────────────── */
+function renderCores(cores) {
+  const el = $('cores');
+  if (el.children.length !== cores.length) {
+    el.innerHTML = cores.map((_, i) =>
+      `<div class="core"><div class="core-bar"><i id="core-${i}" style="width:0%"></i></div><div class="core-l" id="core-l-${i}">${i}</div></div>`
+    ).join('');
+  }
+  cores.forEach((c, i) => {
+    const bar = $(`core-${i}`);
+    if (!bar) return;
+    bar.style.width = c.toFixed(0) + '%';
+    setClass(bar, level(c));
+    setText($(`core-l-${i}`), Math.round(c) + '%');
+  });
+}
+
+/* ── stream ─────────────────────────────────────────────── */
+let lastSeen = 0;
+
+function apply(d) {
+  lastSeen = Date.now();
+
+  // CPU
+  push(cpuData, d.cpu.overall);
+  setText($('cpu-val'), fmt1(d.cpu.overall));
+  if (d.cpu.cores) renderCores(d.cpu.cores);
+
+  // Memory
+  memTotal = d.mem.total_mb || 1;
+  push(memUsed, d.mem.used_mb);
+  push(memCached, d.mem.cached_mb);
+  push(memBuffers, d.mem.buffers_mb);
+  const memPct = 100 * d.mem.used_mb / memTotal;
+  setText($('mem-val'), fmtBytesMB(d.mem.used_mb));
+  setText($('mem-of'), ` of ${fmtBytesMB(d.mem.total_mb)}`);
+  const bar = $('mem-bar');
+  bar.style.width = memPct.toFixed(1) + '%';
+  setClass(bar, level(memPct));
+  setText($('l-used'), fmtBytesMB(d.mem.used_mb));
+  setText($('l-cached'), fmtBytesMB(d.mem.cached_mb));
+  setText($('l-buf'), fmtBytesMB(d.mem.buffers_mb));
+  if (d.mem.swap_total_mb > 0) {
+    $('l-swap-wrap').hidden = false;
+    setText($('l-swap'), `${fmtBytesMB(d.mem.swap_used_mb)} / ${fmtBytesMB(d.mem.swap_total_mb)}`);
+  }
+
+  // Network — rescale to the busiest sample in view, with a floor so an idle VPS
+  // does not draw noise as if it were a spike.
+  const nets = d.nets || [];
+  nets.forEach(n => {
+    if (!netRx[n.iface]) { netRx[n.iface] = series(); netTx[n.iface] = series(); }
+    push(netRx[n.iface], n.rx_mbs);
+    push(netTx[n.iface], n.tx_mbs);
+  });
+  let peak = 0;
+  Object.keys(netRx).forEach(i => {
+    for (const v of netRx[i]) if (v != null && v > peak) peak = v;
+    for (const v of netTx[i]) if (v != null && v > peak) peak = v;
+  });
+  netMax = Math.max(peak * 1.25, 0.05);
+  if (nets.length) {
+    const rx = nets.reduce((a, n) => a + n.rx_mbs, 0);
+    const tx = nets.reduce((a, n) => a + n.tx_mbs, 0);
+    setText($('net-val'), fmtRate(rx + tx));
+    // Both figures move every second; keyed rows mean only the two <b>s are
+    // rewritten, not the whole legend around them.
+    const netItems = [];
+    for (const n of nets) {
+      netItems.push({ key: n.iface + ':in',  colour: '#16a34a', label: n.iface + ' in ',  val: fmtRate(n.rx_mbs) });
+      netItems.push({ key: n.iface + ':out', colour: '#2f6fed', label: n.iface + ' out ', val: fmtRate(n.tx_mbs) });
+    }
+    syncList($('net-legend'), netItems,
+      () => { const s = h('span'); s.append(h('i'), document.createTextNode(''), h('b')); return s; },
+      (el, it) => {
+        const [sw, txt, val] = [el.children[0], el.childNodes[1], el.children[1]];
+        setStyle(sw, 'background', it.colour);
+        if (txt.nodeValue !== it.label) txt.nodeValue = it.label;
+        setText(val, it.val);
+      });
+  }
+
+  // Services, verdict
+  renderKPIs(d);
+  renderMemBar(d);
+  renderStorageBar(d);
+  if (d.services?.length) {
+    // After the memory bar, which is where a service is handed its colour — the
+    // bar and this chart have to agree about which swatch means which service.
+    renderServiceCPU(d.services);
+    renderApps(d.services);
+    renderInfra(d.services);
+    renderVerdict(d);
+  }
+
+  // Just the timestamp: the "live" pill already says the stream is connected, and
+  // watching the clock tick tells you the cadence better than naming it does.
+  setText($('foot'), `Updated ${new Date(d.ts * 1000).toLocaleTimeString()}`);
+  redraw();
+}
+
+function setConn(live, text) {
+  const pill = $('conn');
+  setClass(pill, 'pill ' + (live ? 'live' : 'stale'));
+  setClass(pill.querySelector('.lamp'), 'lamp');
+  setText($('conn-text'), text);
+}
+
+// Marks the page as scrolling until it has been still for 200ms (see the
+// "While the page scrolls" styles). One timer per pause rather than one per
+// scroll event: spa.js keeps every timer a page starts until the page is left.
+(() => {
+  let last = 0, waiting = false;
+  const check = () => {
+    if (performance.now() - last < 200) { setTimeout(check, 100); return; }
+    waiting = false;
+    document.body.classList.remove('scrolling');
+  };
+  window.addEventListener('scroll', () => {
+    last = performance.now();
+    if (waiting) return;
+    waiting = true;
+    document.body.classList.add('scrolling');
+    setTimeout(check, 200);
+  }, { passive: true });
+})();
+
+// Claude usage strip — the quota is re-read every minute on the server, so
+// asking more often than that would only fetch the same numbers again.
+(() => {
+  const until = ts => { let s = (ts||0) - Date.now()/1000; if (s <= 0) return 'now';
+    const d = Math.floor(s/86400), h = Math.floor(s%86400/3600), m = Math.floor(s%3600/60);
+    return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`; };
+  const fill = (el, w) => {
+    const [pct, bar, reset] = [el.children[0], el.children[1].firstChild, el.children[2]];
+    const used = 100 * (w.utilization || 0);
+    setText(pct, Math.round(100 - used) + '% left');
+    setStyle(bar, 'width', used.toFixed(1) + '%');
+    setClass(bar, used >= 85 ? 'r' : used >= 60 ? 'y' : '');
+    setText(reset, 'resets in ' + until(w.reset));
+  };
+  const load = async () => {
+    try {
+      const r = await fetch('/api/limits', { cache:'no-store' });
+      if (!r.ok) return;
+      const L = await r.json();
+      const box = $('quota');
+      if (!box || !(L.fetched > 0)) return;
+      fill($('q-5h'), L.five_h || {});
+      fill($('q-7d'), L.seven_d || {});
+      setClass(box, 'quota' + (L.status === 'rejected' ? ' bad' : L.status === 'allowed_warning' ? ' warn' : ''));
+      setAttr(box, 'title', L.ok ? 'Live quota, the same figures as /usage' : 'Last check failed, showing the previous reading');
+      box.hidden = false;
+    } catch (_) {}
+  };
+  load();
+  setInterval(load, 60000);
+})();
+
+// Releases strip — every push from the build on GitHub to live here. The server
+// asks GitHub every 10 s, so asking it every 5 s keeps the stage fresh; the bars
+// and clocks tick locally in between.
+(() => {
+  const dur = s => { s = Math.max(0, Math.round(s));
+    return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s/60)}m ${String(s%60).padStart(2,'0')}s`
+      : `${Math.floor(s/3600)}h ${String(Math.floor(s%3600/60)).padStart(2,'0')}m`; };
+  const approx = s => s < 60 ? `${Math.round(s)}s` : `${Math.round(s/60)}m`;
+  const running = p => ['queued','building','releasing','waiting','deploying'].includes(p.stage);
+  const stageText = p => ({
+    queued: 'Queued on GitHub',
+    building: 'Building' + (p.step ? ' · ' + p.step : ''),
+    releasing: 'Publishing release',
+    waiting: 'Released · waiting to deploy',
+    deploying: 'Deploying ' + (p.tag || ''),
+    live: 'Live · ' + (p.tag || ''),
+    build_failed: p.step === 'cancelled' ? 'Build cancelled' : 'Build failed',
+    deploy_failed: p.retrying ? 'Deploy failed · retrying' : 'Deploy failed',
+  })[p.stage] || p.stage;
+  // A finished push's two legs as they really were: the deploy took what the
+  // deployer measured, and the build is everything before it (the wait for a
+  // runner included), so the two add up to the "took" time beside them.
+  const liveLegs = p => {
+    if (!p.live_at || !p.started) return null;
+    const total = Math.max(0, p.live_at - p.started);
+    const d = Math.min(total, p.typical_deploy_sec || 0);
+    return { b: total - d, d };
+  };
+  // One line per leg: what it is and how long it took, or has taken so far.
+  const legsHint = (p, now) => {
+    const build = p.built_at ? dur(p.built_at - p.started) : null;
+    switch (p.stage) {
+      case 'queued': case 'building': case 'releasing': return `Building: ${dur(now - p.started)}`;
+      case 'waiting': return `Build: ${build || '?'} · Waiting: ${dur(now - (p.built_at || now))}`;
+      case 'deploying': return `Build: ${build || '?'} · Deploying: ${dur(now - (p.built_at || p.deploy_since))}`;
+      case 'live': {
+        const l = liveLegs(p);
+        return l ? `Build: ${dur(l.b)} · Deploy: ${dur(l.d)}` : null;
+      }
+      case 'build_failed': return `Build failed: ${dur((p.built_at || now) - p.started)}`;
+      case 'deploy_failed': return `Build: ${build || '?'} · Deploy failed`;
+    }
+    return null;
+  };
+  let list = [];
+  const paint = () => {
+    const box = $('pipes');
+    if (!box) return;
+    setHidden(box, !list.length);
+    const now = Date.now() / 1000;
+    syncList(box, list.map(p => ({ key: p.name + '|' + p.sha, p })), () => {
+      const a = h('a', 'pipe'); a.target = '_blank'; a.rel = 'noopener';
+      const bar = h('span', 'pbar');
+      bar.append(h('span'), h('span'));
+      bar.children[0].append(h('i')); bar.children[1].append(h('i'));
+      a.append(h('span', 'lamp'), h('span', 'pn'), h('span', 'ps'), bar, h('span', 'pe'));
+      const ico = h('img', 'ico'); ico.alt = ''; ico.hidden = true;
+      a.children[1].append(ico, h('b'), h('span'));
+      return a;
+    }, (a, { p }) => {
+      let B = p.typical_build_sec || 60, D = p.typical_deploy_sec || 60;
+      const legs = p.stage === 'live' && liveLegs(p);
+      if (legs && legs.b + legs.d > 0) { B = legs.b; D = legs.d; }
+      const fail = p.stage.endsWith('_failed');
+      setClass(a, 'pipe' + (p.stage === 'live' ? ' live' : fail ? ' fail' : ''));
+      setAttr(a, 'href', p.url || '/config');
+      setAttr(a, 'title', `${serviceLabel(p.name)} ${p.sha} — open the build on GitHub`);
+      setClass(a.children[0], 'lamp ' + (running(p) ? 'busy' : fail ? 'down' : 'up'));
+      setIcon(a.children[1].children[0], p.name);
+      setText(a.children[1].children[1], serviceLabel(p.name));
+      setText(a.children[1].children[2], p.title || p.sha);
+      setText(a.children[2], stageText(p));
+      // How far along each leg is. A leg in progress creeps toward its usual
+      // length and stops just short, so a slow one never claims to be done.
+      const near = f => Math.min(0.97, Math.max(0, f));
+      let b = 1, d = 0;
+      // A build waiting for a free runner has not started, so its bar stays empty.
+      if (p.stage === 'queued') b = 0;
+      else if (['building','releasing'].includes(p.stage)) b = p.build_started ? near((now - p.build_started) / B) : 0;
+      else if (p.stage === 'deploying') d = near((now - (p.deploy_since || p.built_at)) / D);
+      else if (p.stage === 'live') d = 1;
+      else if (p.stage === 'build_failed') b = 1;
+      const bar = a.children[3];
+      setStyle(bar.children[0], 'flex', `${B} 1 0`);
+      setStyle(bar.children[1], 'flex', `${D} 1 0`);
+      setStyle(bar.children[0].firstChild, 'width', (100*b).toFixed(1) + '%');
+      setStyle(bar.children[1].firstChild, 'width', (100*d).toFixed(1) + '%');
+      const t = a.children[4];
+      if (running(p)) setHTML(t, `<b>${dur(now - p.started)}</b> of ~${approx(B + D)}`);
+      else if (p.stage === 'live') setHTML(t, `took <b>${dur((p.live_at || now) - p.started)}</b>`);
+      else setHTML(t, `${dur(now - (p.built_at || p.started))} ago`);
+      // Hovering the bar or the time shows each leg's duration; the empty
+      // title keeps the link's own slower tooltip from popping up on top.
+      const hint = legsHint(p, now);
+      for (const el of [bar, t]) { setAttr(el, 'data-tip', hint); setAttr(el, 'title', hint ? '' : null); }
+    });
+  };
+  const load = async () => {
+    if (document.hidden) return;
+    try {
+      const r = await fetch('/api/pipelines', { cache:'no-store' });
+      if (!r.ok) return;
+      list = await r.json();
+      paint();
+    } catch (_) {}
+  };
+  load();
+  setInterval(load, 5000);
+  setInterval(() => { if (!document.hidden && list.some(running)) paint(); }, 1000);
+  document.addEventListener('visibilitychange', load);
+})();
+
+function connect() {
+  const src = new EventSource('/events');
+
+  src.onopen = () => setConn(true, 'live');
+  src.onerror = () => {
+    setConn(false, 'reconnecting…');
+    src.close();
+    setTimeout(connect, 3000);
+  };
+  src.onmessage = (e) => {
+    setConn(true, 'live');
+    try { apply(JSON.parse(e.data)); } catch (_) { /* skip a malformed frame */ }
+  };
+}
+
+// Release versions are only for whoever can act on them; anonymous visitors get
+// a 401 here and simply see no version line.
+async function loadDeployInfo() {
+  try {
+    const r = await fetch('/api/status');
+    if (!r.ok) return;
+    const rows = await r.json();
+    deployInfo = Object.fromEntries(rows.map(x => [x.name, x]));
+  } catch (_) { /* not signed in, or the API is unhappy — the page works without it */ }
+}
+
+window.addEventListener('resize', redraw);
+
+loadDeployInfo();
+setInterval(loadDeployInfo, 60000);
+connect();
+
+// If the stream silently stalls (a sleeping laptop, a dropped proxy), say so
+// rather than showing a minute-old reading as if it were current.
+setInterval(() => {
+  if (lastSeen && Date.now() - lastSeen > 8000) setConn(false, 'stalled');
+}, 4000);
+</script>
+</body>
+</html>

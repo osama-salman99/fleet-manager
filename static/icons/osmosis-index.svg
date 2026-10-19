@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs><linearGradient id="t" x1=".15" y1="0" x2=".85" y2="1"><stop offset="0" stop-color="#3d2a08"/><stop offset="1" stop-color="#1f1302"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14" fill="url(#t)"/>
+  <!-- The osmosis.work "o", the landing page's own mark. -->
+  <path d="M50 28 A18 18 0 1 0 50 36" fill="none" stroke="#F5C05A" stroke-width="8" stroke-linecap="round"/>
+</svg>

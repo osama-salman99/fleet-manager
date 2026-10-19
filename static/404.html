@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1411" media="(prefers-color-scheme: dark)">
+<title>Not found – Health</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+  :root {
+    --bg:#f3f7f4; --panel:#ffffff; --line:#e6ede8;
+    --ink:#12241a; --ink-soft:#53625a; --ink-faint:#61706a;
+    --green:#0a8f52; --green-solid:#13b970;
+    --display:ui-rounded,"SF Pro Rounded","Segoe UI Rounded",system-ui,sans-serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --shadow:0 1px 2px rgba(18,40,28,.05), 0 8px 24px -12px rgba(18,40,28,.14);
+  }
+  *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:
+      radial-gradient(900px 380px at 88% -120px,#e3f3ea,transparent 70%),
+      radial-gradient(760px 320px at 6% -80px,#eaf2fb,transparent 70%),
+      var(--bg);
+    color:var(--ink); min-height:100vh; display:flex; flex-direction:column;
+    font-family:var(--sans); font-size:15px;
+  }
+  header.console { display:flex; align-items:center; gap:14px; padding:14px 20px;
+    border-bottom:1px solid var(--line); background:#ffffff;
+    -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .wordmark { display:flex; align-items:center; gap:9px; text-decoration:none;
+    font-family:var(--display); font-size:1.06rem; font-weight:750; letter-spacing:-.01em; color:var(--ink); }
+  .wordmark .mk { width:26px; height:26px; border-radius:9px; flex:none; position:relative;
+    background:linear-gradient(150deg,#1ccb7b,#0f9a5c); box-shadow:0 3px 9px rgba(19,185,112,.42); }
+  .wordmark .mk::after { content:""; position:absolute; inset:0; margin:auto; width:9px; height:9px;
+    border-radius:50%; background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.4); }
+  .wordmark .dim { color:var(--ink-faint); font-weight:650; }
+
+  main { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:16px; text-align:center; padding:40px 20px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:22px;
+    box-shadow:var(--shadow); padding:40px 44px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .code { font-family:var(--display); font-size:3.6rem; font-weight:800; letter-spacing:-.03em; line-height:1; color:var(--ink); }
+  .code b { color:var(--green-solid); }
+  h2 { font-family:var(--display); font-size:1.2rem; font-weight:750; }
+  p { font-size:.9rem; color:var(--ink-soft); max-width:40ch; line-height:1.6; }
+  a.home { margin-top:4px; padding:9px 18px; font-size:.86rem; font-weight:700;
+    color:#fff; background:var(--green-solid); border-radius:999px; text-decoration:none;
+    box-shadow:0 3px 11px -2px rgba(19,185,112,.55); transition:background .15s; }
+  @media (hover: hover) and (pointer: fine) {
+      a.home:hover { background:#0fa862; }
+  }
+  a.home:active { background:#0fa862; transition-duration: 60ms; }
+/* When the phone is set to dark: the same dashboard at night. Near-black green panels, light
+   ink, and the status colours lifted a shade so they read on dark. The service hues and the
+   charts' series colours are mid-tones that work on both, so they stay. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme:dark;
+    --bg:#0e1411; --bg-2:#131b17; --panel:#161e1a; --panel-2:#1c2621; --panel2:#1c2621;
+    --line:#26312b; --line-soft:#1f2924;
+    --ink:#e4ede7; --ink-soft:#a2b1a8; --soft:#a2b1a8; --ink-faint:#85948b; --faint:#85948b;
+    --green:#3fd08a; --green-bg:rgba(19,185,112,.15);
+    --amber:#f2b04f; --amber-bg:rgba(245,165,36,.15);
+    --red:#ff7a6e; --red-bg:rgba(240,68,56,.15);
+    --blue:#7aa7ff; --blue-bg:rgba(59,130,246,.16);
+    --pink:#e67fc0; --cyan:#3cc4b6; --signal:#3fd08a;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    --shadow-lift:0 2px 6px rgba(0,0,0,.35), 0 16px 32px -14px rgba(0,0,0,.7);
+  }
+  body { background:
+      radial-gradient(900px 380px at 88% -120px, rgba(19,185,112,.10), transparent 70%),
+      radial-gradient(760px 320px at 6% -80px, rgba(59,130,246,.08), transparent 70%),
+      var(--bg); }
+  header.console { background:#0e1411; }
+}
+</style>
+</head>
+<body>
+<header class="console">
+  <a class="wordmark" href="/"><span class="mk"></span>osmosis&nbsp;<span class="dim">health</span></a>
+</header>
+<main>
+  <div class="card">
+    <div class="code">4<b>0</b>4</div>
+    <h2>Nothing monitoring here</h2>
+    <p>The VPS is running fine — this page just doesn't exist.</p>
+    <a class="home" href="/">Back to overview</a>
+  </div>
+</main>
+</body>
+</html>

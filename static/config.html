@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1411" media="(prefers-color-scheme: dark)">
+<title>Deployments – Health</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<script src="/spa.js"></script>
+<script src="/dom.js"></script>
+<script src="/nav.js"></script>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2129;
+    --line: #30363d;
+    --line-soft: #21262d;
+    --ink: #e6edf3;
+    --ink-soft: #9aa5b1;
+    --ink-faint: #6e7681;
+    --blue: #58a6ff;
+    --blue-bg: rgba(88,166,255,.13);
+    --green: #3fb950;
+    --green-bg: rgba(63,185,80,.13);
+    --amber: #d29922;
+    --amber-bg: rgba(210,153,34,.14);
+    --red: #f85149;
+    --red-bg: rgba(248,81,73,.13);
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.55;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 26px 18px 80px; }
+  .mono { font-family: var(--mono); }
+
+  /* ---------- header ---------- */
+  header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  h1 { font-size: 1.55rem; margin: 0 0 3px; }
+  .tagline { color: var(--ink-faint); font-size: 0.9rem; margin: 0; }
+  .hlinks { display: flex; gap: 14px; font-size: 0.88rem; }
+  .hlinks a { color: var(--blue); text-decoration: none; }
+  @media (hover: hover) and (pointer: fine) {
+      .hlinks a:hover { text-decoration: underline; }
+  }
+
+  /* ---------- summary strip ---------- */
+  .hlinks a:active { text-decoration: underline; transition-duration: 60ms; }
+  .summary {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin: 22px 0 26px;
+  }
+  .stat {
+    flex: 1 1 130px; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 13px 15px;
+  }
+  .stat .n { font-size: 1.5rem; font-weight: 700; line-height: 1.15; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 0.78rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+  .stat.good .n { color: var(--green); }
+  .stat.bad  .n { color: var(--red); }
+  .stat.off  .n { color: var(--ink-faint); }
+  .stat.warn .n { color: var(--amber); }
+
+  /* ---------- section ---------- */
+  h2 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin: 0 0 12px; font-weight: 600; }
+
+  /* ---------- service card ---------- */
+  .svc {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; margin-bottom: 10px; overflow: hidden;
+  }
+  .svc.off { opacity: .62; }
+  .svc-main {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    gap: 14px; align-items: center;
+    padding: 15px 17px;
+  }
+  .lamp { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-faint); }
+  .lamp.up   { background: var(--green); box-shadow: 0 0 7px rgba(63,185,80,.65); }
+  .lamp.down { background: var(--red);   box-shadow: 0 0 7px rgba(248,81,73,.6); }
+  .lamp.na   { background: var(--ink-faint); }
+  .lamp.busy { background: var(--blue); box-shadow: 0 0 7px rgba(88,166,255,.6); animation: pulse 1.1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { .lamp.busy { animation: none; } }
+
+  .svc-id { min-width: 0; }
+  .svc-name { font-weight: 650; font-size: 1rem; display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+  /* Fixed-width name column so the status badge lands at the same x on every row;
+     a rare longer name ellipsizes (full name in the title) rather than push it. */
+  .svc-name .ico { width: 20px; height: 20px; flex: none; margin-right: -2px; }
+  .svc-name .ico[hidden] { display: none; }
+  .svc-nm { flex: 0 0 206px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* The badges share one wrapper so they can be patched as a unit; display:contents
+     hands them straight back to the name row's flex layout, so they space and wrap
+     exactly as they did when each badge was a direct child. */
+  .svc-name .badges { display: contents; }
+  .svc-name a { color: inherit; text-decoration: none; }
+  @media (hover: hover) and (pointer: fine) {
+      .svc-name a:hover { color: var(--blue); }
+  }
+  /* Version / freshness / uptime as fixed columns, so where "up to date" and the
+     age sit no longer depends on the version's length. */
+  .svc-name a:active { color: var(--blue); transition-duration: 60ms; }
+  .svc-sub { font-size: 0.83rem; color: var(--ink-faint); margin-top: 3px; display: flex; gap: 14px; align-items: baseline; }
+  .ver-wrap { flex: none; min-width: 104px; }
+  .fresh-wrap { flex: none; min-width: 88px; }
+  .ago-wrap { flex: none; white-space: nowrap; }
+  .ver { font-family: var(--mono); color: var(--ink-soft); }
+
+  .badge {
+    font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+  }
+  .badge.up   { color: var(--green); background: var(--green-bg); }
+  .badge.down { color: var(--red);   background: var(--red-bg); }
+  .badge.na   { color: var(--ink-faint); background: var(--panel-2); }
+  .badge.paused { color: var(--amber); background: var(--amber-bg); }
+  /* Nothing installed: quieter than Paused — it is the end of the line, not a state
+     you are watching. Neutral in both themes (the light-theme block below only
+     restyles .paused/.stale, so this one needs no override). */
+  .badge.gone { color: var(--ink-faint); background: var(--panel-2); }
+  .badge.stale  { color: var(--amber); background: var(--amber-bg); }
+  .badge.busy   { color: var(--blue);  background: var(--blue-bg); }
+
+  /* version freshness */
+  .ver.old { color: var(--amber); }
+  .ver.new { color: var(--blue); }
+  .arrow { color: var(--ink-faint); }
+  .fresh-txt { color: var(--green); }
+  .unk-txt { color: var(--ink-faint); cursor: help; border-bottom: 1px dotted var(--ink-faint); }
+
+  .svc-act { display: flex; align-items: center; gap: 8px; }
+
+  /* toggle — pinned to the right (takes effect when the actions row is full-width,
+     i.e. on mobile; on desktop the actions column is already right-aligned). */
+  .sw { position: relative; width: 38px; height: 21px; flex: none; margin-left: auto; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span {
+    position: absolute; inset: 0; background: #30363d; border-radius: 999px;
+    cursor: pointer; transition: background .15s;
+  }
+  .sw span::before {
+    content: ""; position: absolute; width: 15px; height: 15px; left: 3px; top: 3px;
+    background: #8b949e; border-radius: 50%; transition: transform .15s, background .15s;
+  }
+  .sw input:checked + span { background: rgba(63,185,80,.35); }
+  .sw input:checked + span::before { transform: translateX(17px); background: var(--green); }
+  .sw input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  button {
+    background: var(--panel-2); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 6px; padding: 6px 12px; font-size: 0.83rem; font-weight: 600;
+    cursor: pointer; white-space: nowrap;
+  }
+  @media (hover: hover) and (pointer: fine) {
+      button:hover:not(:disabled) { background: #262c36; border-color: #8b949e; }
+  }
+  button:active:not(:disabled) { background: #262c36; border-color: #8b949e; transition-duration: 60ms; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.primary { background: #238636; border-color: #2ea043; color: #fff; }
+  @media (hover: hover) and (pointer: fine) {
+      button.primary:hover:not(:disabled) { background: #2ea043; }
+  }
+  button.primary:active:not(:disabled) { background: #2ea043; transition-duration: 60ms; }
+  button.link {
+    background: none; border: none; color: var(--ink-faint); padding: 4px 6px;
+    font-size: 0.8rem; font-weight: 500;
+  }
+  @media (hover: hover) and (pointer: fine) {
+      button.link:hover { color: var(--blue); background: none; }
+  }
+  /* Destructive action: readable but never the loudest thing in the row — it sits
+     next to Redeploy, and the two must not look interchangeable. Declared after
+     .link so it wins the colour on a button that carries both classes. */
+  button.link:active { color: var(--blue); background: none; transition-duration: 60ms; }
+  button.danger, button.link.danger { color: var(--red); }
+  @media (hover: hover) and (pointer: fine) {
+      button.danger:hover:not(:disabled),
+      button.link.danger:hover { color: var(--red); background: var(--red-bg); }
+  }
+
+  /* advanced drawer */
+  button.danger:active:not(:disabled),
+  button.link.danger:active { color: var(--red); background: var(--red-bg); transition-duration: 60ms; }
+  .adv { border-top: 1px solid var(--line-soft); padding: 14px 17px 16px; background: var(--panel-2); }
+  .adv[hidden] { display: none; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .f label { display: block; font-size: 0.75rem; color: var(--ink-faint); margin-bottom: 4px; }
+  .f input {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--ink);
+    border-radius: 6px; padding: 7px 9px; font-family: var(--mono); font-size: 0.8rem;
+  }
+  .f input:focus { outline: 2px solid var(--blue); outline-offset: -1px; border-color: var(--blue); }
+
+  /* settings */
+  details.settings {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; margin-top: 26px;
+  }
+  details.settings > summary {
+    padding: 15px 17px; cursor: pointer; font-weight: 600; font-size: 0.95rem;
+    list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  details.settings > summary::-webkit-details-marker { display: none; }
+  details.settings > summary::after { content: "▾"; color: var(--ink-faint); transition: transform .15s; }
+  details.settings[open] > summary::after { transform: rotate(180deg); }
+  .settings-body { padding: 4px 17px 18px; border-top: 1px solid var(--line-soft); }
+  .set-row { margin-top: 16px; }
+  .set-row .hint { font-size: 0.79rem; color: var(--ink-faint); margin-top: 5px; }
+  .inline { display: flex; gap: 8px; align-items: center; }
+  .inline input { flex: 1; min-width: 0; }
+  .ok-chip { font-size: 0.75rem; color: var(--green); background: var(--green-bg); padding: 2px 8px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+  .no-chip { font-size: 0.75rem; color: var(--red); background: var(--red-bg); padding: 2px 8px; border-radius: 999px; font-weight: 700; white-space: nowrap; }
+
+  /* save bar */
+  .savebar {
+    position: sticky; bottom: 0; margin-top: 24px;
+    background: rgba(13,17,23,.92); backdrop-filter: blur(8px);
+    border-top: 1px solid var(--line); padding: 13px 0;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  .savebar[hidden] { display: none; }
+  .msg { font-size: 0.86rem; }
+  .msg.ok { color: var(--green); }
+  .msg.err { color: var(--red); }
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 11px 18px; font-size: 0.88rem; box-shadow: 0 8px 28px rgba(0,0,0,.5); z-index: 20;
+  }
+  .toast[hidden] { display: none; }
+  .toast.ok { border-color: var(--green); }
+  .toast.err { border-color: var(--red); }
+
+  .empty { color: var(--ink-faint); font-size: 0.9rem; padding: 20px; text-align: center; }
+
+  @media (max-width: 620px) {
+    .grid2 { grid-template-columns: 1fr; }
+    .svc-main { grid-template-columns: 10px 1fr; }
+    /* Actions on their own full-width row so the toggle can pin to the far right. */
+    .svc-act { grid-column: 2; margin-top: 8px; }
+    /* Narrow card: the name flexes and (if needed) ellipsizes so the badge stays on
+       the row, pushed to a consistent right edge — never wrapping to a second line. */
+    .svc-name { flex-wrap: nowrap; }
+    .svc-nm { flex: 1 1 auto; min-width: 0; }
+    /* Tighter columns so version · up to date · age still fit one line on a phone. */
+    .svc-sub { gap: 9px; }
+    .ver-wrap { min-width: 96px; }
+    .fresh-wrap { min-width: 74px; }
+  }
+
+/* ============================================================
+   Redesign layer — "instrument panel" console (shared identity)
+   ============================================================ */
+:root {
+  --bg:#f6f9f7; --bg-2:#f1f5f2;
+  --panel:#ffffff; --panel-2:#eef3f0;
+  --line:#e4e9e5; --line-soft:#eef2ef;
+  --ink:#17211b; --ink-soft:#55635b; --ink-faint:#667469;
+  --blue:#2f6fed; --blue-bg:rgba(47,111,237,.10);
+  --green:#0f9e58; --green-bg:rgba(16,179,100,.12);
+  --amber:#bd7d10; --amber-bg:rgba(224,147,42,.15);
+  --red:#dc2f36; --red-bg:rgba(229,72,77,.10);
+  --signal:#0f9e58; --signal-bg:rgba(16,179,100,.12);
+  --r:14px;
+}
+body { background:
+    radial-gradient(1200px 320px at 50% -140px, rgba(16,179,100,.05), transparent 70%),
+    var(--bg); }
+.wrap { max-width:940px; padding:0 18px 80px; }
+
+header.console {
+  position:sticky; top:0; z-index:30;
+  margin:0 calc(50% - 50vw) 22px; padding:12px max(18px, calc(50vw - 560px));
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:#ffffff;
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+  border-bottom:1px solid var(--line);
+}
+header.console::after {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(180deg, rgba(255,255,255,.015) 0 1px, transparent 1px 3px);
+  -webkit-mask:linear-gradient(180deg,#000,transparent); mask:linear-gradient(180deg,#000,transparent);
+}
+.wordmark { display:flex; align-items:center; text-decoration:none;
+  font-family:var(--mono); font-size:.98rem; letter-spacing:-.01em; }
+.wordmark span:first-of-type { color:var(--ink); font-weight:600; }
+.wordmark span:last-of-type { color:var(--ink-soft); font-weight:500; }
+.wordmark i { color:var(--signal); font-style:normal; margin:0 1px; text-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .wordmark:hover span:last-of-type { color:var(--ink); }
+}
+header.console .nav { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:auto; }
+.navlink { text-decoration:none; color:var(--ink-soft); font-size:.82rem; font-weight:550;
+  padding:6px 11px; border-radius:8px; border:1px solid transparent; white-space:nowrap;
+  transition:color .15s, background-color .15s, border-color .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink:hover { color:var(--ink); background:var(--panel); }
+}
+.navlink:active { color:var(--ink); background:var(--panel); transition-duration: 60ms; }
+.navlink.current { color:var(--signal); border-color:var(--line); background:var(--panel);
+  box-shadow:inset 0 -2px 0 var(--signal); }
+.navlink.signout { color:var(--ink-faint); margin-left:4px; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink.signout:hover { color:var(--red); }
+}
+.navlink.signout:active { color:var(--red); transition-duration: 60ms; }
+.navlink:focus-visible { outline:2px solid var(--signal); outline-offset:2px; }
+
+.pagehead { margin:24px 0 4px; display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+.pagehead h1 { font-size:1.5rem; font-weight:680; letter-spacing:-.015em; }
+.tagline { color:var(--ink-faint); font-size:.88rem; margin:6px 0 0; }
+/* Sign out lives here (in the page, not the nav) so the header is identical to
+   every other page and nothing shifts in it when you switch tabs. */
+.signout { flex:none; text-decoration:none; color:var(--ink-faint); font-size:.85rem; font-weight:600;
+  padding:7px 13px; border-radius:999px; border:1px solid var(--line); background:var(--panel);
+  transition:color .15s, border-color .15s, background-color .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .signout:hover { color:var(--red); border-color:#f3cdc7; background:var(--red-bg); }
+}
+
+/* section eyebrow */
+.signout:active { color:var(--red); border-color:#f3cdc7; background:var(--red-bg); transition-duration: 60ms; }
+h2 { font-family:var(--mono); letter-spacing:.12em; color:var(--ink-faint);
+  display:flex; align-items:center; gap:8px; }
+h2::before { content:""; width:11px; height:2px; background:var(--signal); border-radius:2px;
+  box-shadow:0 0 8px rgba(16,179,100,.55); flex:none; }
+
+/* surfaces */
+.stat, .svc, details.settings, .toast { border-radius:var(--r); }
+.stat, .svc { box-shadow:0 1px 2px rgba(20,45,32,.05); }
+.stat .l { font-family:var(--mono); letter-spacing:.06em; }
+.stat .n { font-family:var(--mono); letter-spacing:-.02em; }
+
+/* controls */
+button { background:var(--panel-2); border-color:var(--line); color:var(--ink); }
+@media (hover: hover) and (pointer: fine) {
+    button:hover:not(:disabled) { background:#e6ece8; border-color:#c8d2cb; }
+}
+button:active:not(:disabled) { background:#e6ece8; border-color:#c8d2cb; transition-duration: 60ms; }
+button.primary { background:var(--green); border-color:var(--green); color:#ffffff; }
+@media (hover: hover) and (pointer: fine) {
+    button.primary:hover:not(:disabled) { background:#0c8a4c; border-color:#0c8a4c; }
+}
+button.primary:active:not(:disabled) { background:#0c8a4c; border-color:#0c8a4c; transition-duration: 60ms; }
+button.link { color:var(--ink-faint); }
+@media (hover: hover) and (pointer: fine) {
+    button.link:hover { color:var(--signal); background:none; }
+}
+button.link:active { color:var(--signal); background:none; transition-duration: 60ms; }
+.sw span { background:#d3dbd5; }
+.sw span::before { background:#ffffff; }
+.sw input:checked + span { background:rgba(16,179,100,.35); }
+.sw input:checked + span::before { background:var(--green); }
+.f input { background:#ffffff; }
+.f input:focus { outline:2px solid var(--signal); outline-offset:-1px; border-color:var(--signal); }
+.savebar { background:rgba(246,249,247,.94); }
+.toast { box-shadow:0 8px 28px rgba(20,40,30,.14); }
+.ok-chip { color:var(--green); background:var(--green-bg); }
+
+@media (max-width:560px){
+  header.console .nav { width:100%; margin-left:0; }
+}
+
+/* Tab pill. Switching tabs runs a view transition (spa.js starts it for its
+   in-place swap; a real page load uses the browser's own) that carries one shared
+   pill from the old tab to the new one, with a little spring and stretch on the
+   way. Only the pill and the three tab labels take part: the page itself is left
+   out (root has no name), so everything else still changes in one paint rather
+   than cross-fading. The pill is its own element behind the links, not the
+   current link's background, so the text never moves or squashes; each label
+   only fades between its plain and selected colour. Browsers without view
+   transitions, and anyone who asks for less motion, just switch. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+:root { view-transition-name:none; }
+:root::view-transition { pointer-events:none; }
+header.console .nav { position:relative; }
+.navpill { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none;
+  border-radius:999px; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55);
+  view-transition-name:navpill; }
+.navlink { position:relative; }
+.navlink[href="/"] { view-transition-name:nav-overview; }
+.navlink[href="/claude"] { view-transition-name:nav-claude; }
+.navlink[href="/hetzner"] { view-transition-name:nav-hetzner; }
+.navlink[href="/config"] { view-transition-name:nav-deploy; }
+.navlink[href="/builds"] { view-transition-name:nav-builds; }
+.nav.pilled .navlink.current { color:#fff; background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled .navlink.current:hover { color:#fff; background:transparent; box-shadow:none; }
+}
+/* Dragging the pill (nav.js): while a finger steers it, the labels go plain
+   except the one under the pill, the pill swells a touch and follows the finger
+   directly, then springs onto the tab it is let go over. A hovering mouse
+   steers it the same way, minus the swell. pan-y keeps vertical
+   swipes scrolling the page; only sideways ones move the pill. */
+.nav.pilled .navlink.current:active { color:#fff; background:transparent; box-shadow:none; transition-duration: 60ms; }
+header.console .nav { touch-action:pan-y; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.nav.pilled.steer .navlink { color:var(--ink-soft); background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled.steer .navlink:hover { color:var(--ink-soft); background:transparent; box-shadow:none; }
+}
+.nav.pilled.steer .navlink:active { color:var(--ink-soft); background:transparent; box-shadow:none; transition-duration: 60ms; }
+.nav.pilled.steer .navlink.over { color:#fff; }
+.nav.steer .navpill { transition:left .34s cubic-bezier(.3,1.3,.5,1), width .22s ease, scale .2s ease; }
+.nav.dragging .navpill { transition:width .22s ease, scale .2s ease; scale:1.07; }
+@media (prefers-reduced-motion: reduce) { .nav.steer .navpill { transition:none; } }
+::view-transition-group(navpill) { animation-duration:.55s;
+  animation-timing-function:linear(0, 0.062, 0.204, 0.377, 0.548, 0.7, 0.822, 0.913, 0.976, 1.016, 1.037, 1.045, 1.045, 1.04, 1.032, 1.024, 1.017, 1.01, 1.006, 1.002, 1); }
+/* While it moves, the pill is drawn fresh rather than as a stretched picture of
+   the old and new pill, which would warp its round ends and double its edge. */
+::view-transition-old(navpill), ::view-transition-new(navpill) { animation:none; opacity:0; }
+::view-transition-image-pair(navpill) { border-radius:999px; background:var(--green-solid);
+  box-shadow:0 3px 11px -2px rgba(19,185,112,.55); animation:navpill-stretch .55s cubic-bezier(.3,0,.3,1); }
+@keyframes navpill-stretch { 0%,100% { scale:1; } 35% { scale:1.08 .88; } }
+::view-transition-group(nav-overview), ::view-transition-group(nav-claude), ::view-transition-group(nav-deploy), ::view-transition-group(nav-builds) { animation-duration:.25s; }
+</style>
+
+<style>
+/* ============================================================
+   Fresh "health app" restyle — friendly light look
+   ============================================================ */
+:root{
+  color-scheme:light;
+  --bg:#f3f7f4; --bg-2:#e9f0ec; --panel:#ffffff; --panel-2:#f1f6f2;
+  --line:#e6ede8; --line-soft:#eef3f0;
+  --ink:#12241a; --ink-soft:#53625a; --ink-faint:#61706a;
+  --green:#0a8f52; --green-solid:#13b970; --green-bg:#e6f7ee;
+  --amber:#b06a08; --amber-solid:#f5a524; --amber-bg:#fdf1de;
+  --red:#d92d20; --red-solid:#f04438; --red-bg:#fdecea;
+  --blue:#2563eb; --blue-solid:#3b82f6; --blue-bg:#e9f1fe;
+  --signal:#0a8f52;
+  --display:ui-rounded,"SF Pro Rounded","Segoe UI Rounded",system-ui,sans-serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --shadow:0 1px 2px rgba(18,40,28,.05), 0 8px 24px -12px rgba(18,40,28,.14);
+  --r:16px;
+}
+body{ background:
+  radial-gradient(900px 380px at 88% -120px,#e3f3ea,transparent 70%),
+  radial-gradient(760px 320px at 6% -80px,#eaf2fb,transparent 70%),
+  var(--bg); color:var(--ink); font-family:var(--sans); }
+header.console{ background:#ffffff; line-height:1.5;
+  -webkit-backdrop-filter:none; backdrop-filter:none; border-bottom:1px solid var(--line); }
+header.console::after{ display:none; }
+.wordmark{ display:flex; align-items:center; gap:9px; text-decoration:none; font-family:var(--display); font-size:1.06rem; font-weight:750; letter-spacing:-.01em; color:var(--ink); }
+.wordmark .mk{ width:26px; height:26px; border-radius:9px; flex:none; position:relative; background:linear-gradient(150deg,#1ccb7b,#0f9a5c); box-shadow:0 3px 9px rgba(19,185,112,.42); }
+.wordmark .mk::after{ content:""; position:absolute; inset:0; margin:auto; width:9px; height:9px; border-radius:50%; background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.4); }
+.wordmark span.dim{ color:var(--ink-faint); font-weight:650; }
+.navlink{ color:var(--ink-soft); font-weight:600; font-size:.85rem; padding:7px 14px; border-radius:999px; border:none; box-shadow:none; transition:color .15s,background-color .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink:hover{ color:var(--ink); background:var(--panel-2); }
+}
+.navlink:active { color:var(--ink); background:var(--panel-2); transition-duration: 60ms; }
+.navlink.current{ color:#fff; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55); }
+/* Sign out sits to the LEFT of the tab group so the four tabs stay pinned to the
+   same right-aligned spot as every other page (a right-anchored flex row is sized
+   from its right edge, so a left item doesn't move them). A divider keeps it read
+   as a separate action rather than a fifth tab. */
+.navlink.signout{ color:var(--ink-faint); background:none; box-shadow:none;
+  margin-right:10px; padding-right:16px; border-right:1px solid var(--line); border-radius:0; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink.signout:hover{ color:var(--red); background:none; }
+}
+.navlink.signout:active { color:var(--red); background:none; transition-duration: 60ms; }
+.navlink:focus-visible{ outline:2px solid var(--green-solid); outline-offset:2px; }
+.pagehead h1{ font-family:var(--display); font-weight:770; letter-spacing:-.02em; }
+.tagline{ color:var(--ink-faint); }
+h2{ font-family:var(--display); font-weight:700; font-size:1.05rem; letter-spacing:-.01em; color:var(--ink); text-transform:none; }
+h2::before{ display:none !important; }
+.stat,.svc,details.settings,.toast{ border-radius:var(--r); box-shadow:var(--shadow); border-color:var(--line); }
+.stat .n{ font-family:var(--display); } .stat .l{ font-family:var(--sans); text-transform:none; letter-spacing:0; color:var(--ink-faint); }
+.stat.good .n{ color:var(--green); } .stat.bad .n{ color:var(--red); } .stat.warn .n{ color:var(--amber); } .stat.off .n{ color:var(--ink-faint); }
+.svc-name{ font-family:var(--display); } @media (hover: hover) and (pointer: fine) {
+    .svc-name a:hover{ color:var(--green); }
+}
+.svc-name a:active { color:var(--green); transition-duration: 60ms; }
+.lamp.up{ background:var(--green-solid); box-shadow:0 0 0 3px rgba(19,185,112,.18); }
+.lamp.down{ background:var(--red-solid); box-shadow:0 0 0 3px rgba(240,68,56,.18); }
+.lamp.busy{ background:var(--blue-solid); box-shadow:0 0 0 3px rgba(59,130,246,.2); }
+.badge.up{ color:var(--green); background:var(--green-bg); } .badge.down{ color:var(--red); background:var(--red-bg); }
+.badge.paused,.badge.stale{ color:var(--amber); background:var(--amber-bg); } .badge.busy{ color:var(--blue); background:var(--blue-bg); }
+.badge.failed{ color:var(--red); background:var(--red-bg); }
+.badge.retrying{ color:var(--amber); background:var(--amber-bg); }
+.ver{ color:var(--ink-soft); } .fresh-txt{ color:var(--green); }
+button{ border-radius:10px; }
+@media (hover: hover) and (pointer: fine) {
+    button:hover:not(:disabled){ background:var(--panel-2); border-color:#cdd8d0; }
+}
+button:active:not(:disabled) { background:var(--panel-2); border-color:#cdd8d0; transition-duration: 60ms; }
+button.primary{ background:var(--green-solid); border-color:var(--green-solid); color:#fff; }
+@media (hover: hover) and (pointer: fine) {
+    button.primary:hover:not(:disabled){ background:#0fa862; border-color:#0fa862; }
+}
+button.primary:active:not(:disabled) { background:#0fa862; border-color:#0fa862; transition-duration: 60ms; }
+button.retry{ background:var(--red-solid); border-color:var(--red-solid); color:#fff; }
+@media (hover: hover) and (pointer: fine) {
+    button.retry:hover:not(:disabled){ background:#e0362b; border-color:#e0362b; }
+}
+button.retry:active:not(:disabled) { background:#e0362b; border-color:#e0362b; transition-duration: 60ms; }
+button.link{ color:var(--ink-faint); } @media (hover: hover) and (pointer: fine) {
+    button.link:hover{ color:var(--green); background:none; }
+}
+button.link:active { color:var(--green); background:none; transition-duration: 60ms; }
+button.link.danger{ color:var(--red); } @media (hover: hover) and (pointer: fine) {
+    button.link.danger:hover{ color:var(--red); background:var(--red-bg); }
+}
+button.link.danger:active { color:var(--red); background:var(--red-bg); transition-duration: 60ms; }
+.sw span{ background:#d3dbd5; } .sw span::before{ background:#fff; }
+.sw input:checked + span{ background:rgba(19,185,112,.4); } .sw input:checked + span::before{ background:var(--green-solid); }
+.f input{ background:#fff; border-radius:9px; } .f input:focus{ outline:2px solid var(--green-solid); border-color:var(--green-solid); }
+.savebar{ background:rgba(243,247,244,.94); }
+.ok-chip{ color:var(--green); background:var(--green-bg); } .no-chip{ color:var(--red); background:var(--red-bg); }
+/* When the phone is set to dark: the same dashboard at night. Near-black green panels, light
+   ink, and the status colours lifted a shade so they read on dark. The service hues and the
+   charts' series colours are mid-tones that work on both, so they stay. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme:dark;
+    --bg:#0e1411; --bg-2:#131b17; --panel:#161e1a; --panel-2:#1c2621; --panel2:#1c2621;
+    --line:#26312b; --line-soft:#1f2924;
+    --ink:#e4ede7; --ink-soft:#a2b1a8; --soft:#a2b1a8; --ink-faint:#85948b; --faint:#85948b;
+    --green:#3fd08a; --green-bg:rgba(19,185,112,.15);
+    --amber:#f2b04f; --amber-bg:rgba(245,165,36,.15);
+    --red:#ff7a6e; --red-bg:rgba(240,68,56,.15);
+    --blue:#7aa7ff; --blue-bg:rgba(59,130,246,.16);
+    --pink:#e67fc0; --cyan:#3cc4b6; --signal:#3fd08a;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    --shadow-lift:0 2px 6px rgba(0,0,0,.35), 0 16px 32px -14px rgba(0,0,0,.7);
+  }
+  body { background:
+      radial-gradient(900px 380px at 88% -120px, rgba(19,185,112,.10), transparent 70%),
+      radial-gradient(760px 320px at 6% -80px, rgba(59,130,246,.08), transparent 70%),
+      var(--bg); }
+  header.console { background:#0e1411; }
+  .signout:hover, .signout:active { border-color:#55291f; }
+  button:hover:not(:disabled), button:active:not(:disabled) { background:#24302a; border-color:#34423a; }
+  button.primary:hover:not(:disabled), button.primary:active:not(:disabled) { background:#0c8a4c; border-color:#0c8a4c; }
+  .sw span { background:#34423a; }
+  .f input { background:var(--panel-2); }
+  .savebar { background:rgba(14,20,17,.94); }
+}
+/* Five tabs fit on one line on a phone only with tighter spacing. */
+@media (max-width:560px){ header.console .nav{ flex-wrap:nowrap; gap:0; justify-content:space-between; }
+  .navlink{ padding:7px 7px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="console">
+    <a class="wordmark" href="/"><span class="mk"></span>osmosis&nbsp;<span class="dim">health</span></a>
+    <div class="nav">
+      <span class="navpill" aria-hidden="true"></span>
+      <a class="navlink" href="/">Overview</a>
+      <a class="navlink" href="/claude">Claude</a>
+      <a class="navlink" href="/hetzner">Hetzner</a>
+      <a class="navlink current" href="/config">Deploy</a>
+      <a class="navlink" href="/builds">Builds</a>
+    <script>navPill(); // the tab pill — see nav.js</script>
+    </div>
+  </header>
+  <div class="pagehead">
+    <div>
+      <h1>Deployments</h1>
+      <p class="tagline">Push to <span class="mono">master</span> and it ships itself. This is where you watch it.</p>
+    </div>
+    <a class="signout" href="/logout">Sign out</a>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <h2>Services</h2>
+  <div id="list"><div class="empty">Loading…</div></div>
+
+  <details class="settings">
+    <summary><span>Settings</span></summary>
+    <div class="settings-body">
+
+      <div class="set-row">
+        <div class="f">
+          <label for="token">GitHub token</label>
+          <div class="inline">
+            <input type="password" id="token" placeholder="not set" autocomplete="off">
+            <span id="tokchip"></span>
+          </div>
+          <p class="hint">Read-only token used to download release files from your private repos. Leave untouched to keep the current one.</p>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="f">
+          <label for="secret">Webhook secret</label>
+          <div class="inline">
+            <input type="password" id="secret" placeholder="not set" autocomplete="off">
+            <button type="button" id="reveal">Show</button>
+            <button type="button" id="gen">New</button>
+          </div>
+          <p class="hint">Must match the secret on each repo's GitHub webhook. Changing it here means updating it on all 7 repos.</p>
+        </div>
+      </div>
+
+      <div class="set-row">
+        <div class="inline" style="justify-content: space-between;">
+          <div>
+            <div style="font-weight:600; font-size:0.92rem;">Build-failure watchdog</div>
+            <p class="hint" style="margin-top:2px;">Fixes broken <span class="mono">master</span> builds automatically.</p>
+          </div>
+          <label class="sw"><input type="checkbox" id="watchdog"><span></span></label>
+        </div>
+      </div>
+
+    </div>
+  </details>
+
+  <div class="savebar" id="savebar" hidden>
+    <button class="primary" id="save">Save changes</button>
+    <button class="link" id="discard">Discard</button>
+    <span class="msg" id="msg"></span>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+
+  let cfg = null;       // live config being edited
+  let saved = null;     // last-saved snapshot, for dirty checking
+  let status = [];
+
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const dirty = () => saved && JSON.stringify(cfg) !== JSON.stringify(saved);
+
+  // Tags and GitHub error strings land in markup and in a title="" attribute.
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  function toast(text, ok = true) {
+    const t = $('toast');
+    t.textContent = text;
+    t.className = 'toast ' + (ok ? 'ok' : 'err');
+    t.hidden = false;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => { t.hidden = true; }, 3500);
+  }
+
+  function markDirty() { $('savebar').hidden = !dirty(); }
+
+  // "3 minutes ago", "2 days ago"
+  function ago(iso) {
+    if (!iso) return 'never deployed';
+    const s = Math.max(0, (Date.now() - new Date(iso)) / 1000);
+    if (s < 60) return 'just now';
+    const units = [['minute', 60], ['hour', 3600], ['day', 86400]];
+    let label = 'minute', val = Math.floor(s / 60);
+    for (const [name, secs] of units) {
+      const v = Math.floor(s / secs);
+      if (v >= 1) { label = name; val = v; }
+    }
+    return `${val} ${label}${val === 1 ? '' : 's'} ago`;
+  }
+
+  // We can only call a service outdated when we know both what it runs and what
+  // the newest release is; anything else is "no opinion".
+  const isStale = (st) => !!(st.tag && st.latest && !st.up_to_date);
+  // The deployer cannot decommission itself — mirrored server-side, which is what
+  // actually enforces it; this only keeps the button from offering the impossible.
+  const isSelf = (svc) => svc.unit === 'vps-health.service';
+
+  function renderSummary() {
+    const up = status.filter(s => s.state === 'active' || (s.state === 'n/a' && s.tag));
+    // A service being installed is stopped for a moment by design; counting it as
+    // Down turns every deploy into a red number on your own dashboard.
+    // Switched off on purpose is not the same as broken: a paused service is
+    // stopped *because* it was paused, it is already counted under Paused, and
+    // showing it in red Down is the same false alarm the launcher used to raise.
+    // The per-card lamp has always drawn it this way — this makes the tile agree.
+    const down = status.filter(s => !s.deploying && s.enabled && (s.state === 'inactive' || s.state === 'unknown'));
+    const paused = status.filter(s => !s.enabled);
+    const stale = status.filter(isStale);
+
+    // Five tiles that never change shape, only their numbers — so they are built
+    // once and then only the numbers are written.
+    const tiles = [
+      { key: 'up',     n: up.length,     l: 'Running',  cls: 'good' },
+      { key: 'down',   n: down.length,   l: 'Down',     cls: down.length ? 'bad' : '' },
+      { key: 'stale',  n: stale.length,  l: 'Outdated', cls: stale.length ? 'warn' : '' },
+      { key: 'paused', n: paused.length, l: 'Paused',   cls: paused.length ? 'off' : '' },
+      { key: 'total',  n: status.length, l: 'Services', cls: '' },
+    ];
+    syncList($('summary'), tiles,
+      () => { const el = h('div'); el.append(h('div', 'n'), h('div', 'l')); return el; },
+      (el, t) => {
+        setClass(el, 'stat' + (t.cls ? ' ' + t.cls : ''));
+        setText(el.children[0], String(t.n));
+        setText(el.children[1], t.l);
+      });
+  }
+
+  /* The card scaffolding — lamp, name, version line, buttons, the Details panel —
+     is identical for every service and on every refresh; only the labels inside it
+     move. It is built once per service, and the listeners are bound to that one
+     element, so a refresh can no longer collapse a panel you opened, wipe a field
+     you were typing in, or drop text you had selected. */
+  const CARD_HTML = `
+    <div class="svc-main">
+      <span class="lamp"></span>
+      <div class="svc-id">
+        <div class="svc-name"><img class="ico" alt="" hidden><span class="svc-nm"></span><span class="badges"></span></div>
+        <div class="svc-sub">
+          <span class="ver-wrap"></span>
+          <span class="fresh-wrap"></span>
+          <span class="ago-wrap"></span>
+        </div>
+      </div>
+      <div class="svc-act">
+        <button data-act="redeploy"></button>
+        <button class="link" data-act="adv">Details</button>
+        <button class="link danger" data-act="decom" title="Stop this service and remove the installed build">Decommission</button>
+        <label class="sw" title="Auto-deploy">
+          <input type="checkbox" data-act="toggle">
+          <span></span>
+        </label>
+      </div>
+    </div>
+    <div class="adv" hidden>
+      <div class="grid2">
+        <div class="f"><label>Repository</label><input type="text" data-k="repo"></div>
+        <div class="f"><label>systemd unit</label><input type="text" data-k="unit"></div>
+        <div class="f"><label>Installs to</label><input type="text" data-k="target"></div>
+        <div class="f"><label>Artifact type</label><input type="text" data-k="kind"></div>
+        <div class="f"><label>Asset pattern</label><input type="text" data-k="asset_pattern"></div>
+        <div class="f"><label>Health check URL</label><input type="text" data-k="health_url"></div>
+        <div class="f"><label>Public URL</label><input type="text" data-k="public_url"></div>
+      </div>
+    </div>`;
+
+  function buildCard() {
+    const card = h('div', 'svc');
+    card.innerHTML = CARD_HTML;
+    // Every listener reads the service and its status off the card rather than
+    // closing over them: the card outlives the refresh, and /api/status hands back
+    // fresh objects each time.
+    card.querySelector('[data-act="toggle"]').addEventListener('change', (e) => {
+      card._svc.enabled = e.target.checked;
+      markDirty();
+      renderServices();
+    });
+
+    card.querySelector('[data-act="adv"]').addEventListener('click', () => {
+      const d = card.querySelector('.adv');
+      d.hidden = !d.hidden;
+    });
+
+    card.querySelectorAll('[data-k]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        card._svc[inp.dataset.k] = inp.value;
+        markDirty();
+      });
+    });
+
+    const rb = card.querySelector('[data-act="redeploy"]');
+    rb.addEventListener('click', async () => {
+      const svc = card._svc;
+      // Hold the button in its pressed state until the request has had time to
+      // land: a refresh arriving in between must not put "Redeploy" back on a
+      // button that is mid-flight.
+      rb._pending = true;
+      rb.disabled = true; rb.textContent = 'Deploying…';
+      try {
+        const r = await fetch('/api/redeploy/' + encodeURIComponent(svc.name), { method: 'POST' });
+        toast(r.ok ? `Redeploying ${svc.name} — this page will catch up on its own` : `Could not redeploy ${svc.name}`, r.ok);
+      } catch { toast('Could not reach the server', false); }
+      setTimeout(() => { rb._pending = false; refresh(); }, 4000);
+    });
+
+    // Destructive and not undoable by another click, so spell out what goes and
+    // what stays before doing it — the difference between this and a teardown is
+    // the whole reason it is safe to have behind a button.
+    const db = card.querySelector('[data-act="decom"]');
+    db.addEventListener('click', async () => {
+      const svc = card._svc;
+      const keeps = svc.unit ? 'The systemd unit, Caddy block and data directory stay' : 'The repo entry stays';
+      const lines = [
+        `Decommission ${svc.name}?`, '',
+        svc.unit ? `• stop and disable ${svc.unit}` : '• (no unit to stop)',
+        `• delete the installed build at ${svc.target || '—'}`,
+        '• switch auto-deploy off', '',
+        `${keeps}, so Redeploy can bring it back.`
+      ];
+      if (!confirm(lines.join('\n'))) return;
+      db._pending = true;
+      db.disabled = true; db.textContent = 'Decommissioning…';
+      try {
+        const r = await fetch('/api/decommission/' + encodeURIComponent(svc.name), { method: 'POST' });
+        const d = await r.json().catch(() => ({}));
+        toast(r.ok ? `Decommissioned ${svc.name}` : `Could not decommission ${svc.name}: ${d.error || r.status}`, r.ok);
+        if (d.steps && d.steps.length) console.log(`decommission ${svc.name}:`, d.steps);
+      } catch { toast('Could not reach the server', false); }
+      // The server switched auto-deploy off. Mirror that here AND in the saved
+      // baseline — otherwise this page still holds `enabled: true` and the next
+      // Save would put the service straight back into the deploy loop. Only this
+      // one field is touched, so edits in progress elsewhere survive.
+      svc.enabled = false;
+      const base = saved && saved.services && saved.services.find(s => s.name === svc.name);
+      if (base) base.enabled = false;
+      db._pending = false;
+      db.disabled = false; db.textContent = 'Decommission';
+      markDirty();
+      await refresh();
+    });
+
+    return card;
+  }
+
+  function fillCard(card, svc, st) {
+    card._svc = svc;
+    card._st = st;
+
+    const isStatic = !svc.unit;
+    const busy = !!st.deploying;
+    const up = st.state === 'active' || (isStatic && st.tag);
+    const down = !busy && (st.state === 'inactive' || st.state === 'unknown');
+    const stale = isStale(st);
+
+    setClass(card, 'svc' + (svc.enabled ? '' : ' off'));
+
+    // Deploying wins over everything: it explains the state, and it is the state
+    // the other labels would otherwise be guessing wrong about.
+    const lamp = busy ? 'busy' : !svc.enabled ? 'na' : up ? 'up' : down ? 'down' : 'na';
+    setClass(card.querySelector('.lamp'), 'lamp ' + lamp);
+
+    const url = st.has_health ? svc.health_url : null;
+    setIcon(card.querySelector('.svc-name .ico'), svc.name);
+    const nm = card.querySelector('.svc-nm');
+    setAttr(nm, 'title', svc.name);
+    setHTML(nm, url ? `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(serviceLabel(svc.name))}</a>` : esc(serviceLabel(svc.name)));
+
+    // Paused and decommissioned are both "switched off", but only one still has
+    // a build sitting on disk — worth telling apart, since it is the difference
+    // between flipping the toggle back on and a full redeploy.
+    const badge = busy
+      ? '<span class="badge busy">Deploying</span>'
+      : !svc.enabled
+      ? (st.tag || st.state === 'active'
+          ? '<span class="badge paused">Paused</span>'
+          : '<span class="badge gone" title="Nothing is installed — press Redeploy to bring it back.">Not deployed</span>')
+      : up ? '<span class="badge up">Running</span>'
+      : down ? '<span class="badge down">Down</span>'
+      : '<span class="badge na">—</span>';
+    const staleBadge = stale ? ' <span class="badge stale">Update available</span>' : '';
+    // Shown when the newest release used up all its retries and gave up: the poller
+    // will not try it again on its own, so the Retry button below is the way back.
+    // A failed latest release is either still auto-retrying on a backoff (amber)
+    // or has spent its auto-retries and is waiting for a human (red).
+    const failedBadge = st.failed
+      ? (st.failed_permanent
+          ? ' <span class="badge failed" title="The latest release failed every automatic retry. Press Retry to try again.">Deploy failed</span>'
+          : ' <span class="badge retrying" title="The latest release failed and is auto-retrying with backoff. Press Retry to try now.">Retrying…</span>')
+      : '';
+    setHTML(card.querySelector('.badges'), badge + staleBadge + failedBadge);
+
+    // Version: what is running, and how it compares to the newest release —
+    // except mid-deploy, when what matters is the one coming in.
+    const verHTML = busy && st.deploy_tag
+      ? `<span class="ver">${st.tag ? esc(st.tag) : 'nothing'}</span><span class="arrow"> → </span><span class="ver new">${esc(st.deploy_tag)}</span>`
+      : !st.tag
+      ? '<span class="ver">no release yet</span>'
+      : stale
+        ? `<span class="ver old">${esc(st.tag)}</span><span class="arrow"> → </span><span class="ver">${esc(st.latest)}</span>`
+        : `<span class="ver">${esc(st.tag)}</span>`;
+    setHTML(card.querySelector('.ver-wrap'), verHTML);
+
+    setHTML(card.querySelector('.fresh-wrap'), st.up_to_date
+      ? '<span class="fresh-txt">up to date</span>'
+      : st.latest_err
+        ? `<span class="unk-txt" title="${esc(st.latest_err)}">latest unknown</span>`
+        : '');
+
+    // The only part of the card that moves on its own, so it gets its own node:
+    // rewriting "4 minutes ago" must not disturb the version beside it.
+    setText(card.querySelector('.ago-wrap'), ago(st.deployed_at));
+
+    const rb = card.querySelector('[data-act="redeploy"]');
+    if (!rb._pending) {
+      setClass(rb, st.failed_permanent ? 'retry' : '');
+      setProp(rb, 'disabled', busy);
+      setText(rb, busy ? 'Deploying…' : st.failed ? (st.failed_permanent ? 'Retry' : 'Retry now') : stale ? 'Update' : 'Redeploy');
+    }
+
+    // Decommissioning is only meaningful while there is something installed or
+    // running to take away — and never for vps-health, which is the process that
+    // would have to stop itself and delete its own binary to do it.
+    const db = card.querySelector('[data-act="decom"]');
+    setHidden(db, !(!busy && !isSelf(svc) && (!!st.tag || st.state === 'active')));
+
+    setProp(card.querySelector('[data-act="toggle"]'), 'checked', !!svc.enabled);
+    card.querySelectorAll('[data-k]').forEach(inp => setValue(inp, svc[inp.dataset.k] || ''));
+  }
+
+  function renderServices() {
+    // Order by how much each service is still part of the running fleet: live
+    // ones first, then switched off but still installed, then nothing deployed at
+    // all (decommissioned, or configured but never deployed). What you no longer
+    // run sinks to the bottom instead of sitting between two services you do.
+    //
+    // Sorting a COPY is the point: cfg.services is what Save writes back, so
+    // reordering it in place would silently rewrite deploy-config on every save.
+    // The svc objects are the same references, so edits still land on the config.
+    const tierOf = (svc, st) => {
+      if (svc.enabled) return 0;                          // the fleet you run
+      return (st.tag || st.state === 'active') ? 1 : 2;   // paused | nothing installed
+    };
+    const ordered = cfg.services
+      .map((svc, i) => ({ svc, i, st: status.find(s => s.name === svc.name) || {} }))
+      .sort((a, b) => tierOf(a.svc, a.st) - tierOf(b.svc, b.st) || a.i - b.i);
+
+    // Clear the "Loading…" placeholder the page ships with. syncList only removes
+    // the elements it put there itself, so anything already in the list would
+    // otherwise sit below the cards forever.
+    scaffold($('list'), '');
+
+    // Keyed by service name, so flipping a toggle re-sorts by moving cards rather
+    // than rebuilding all of them.
+    syncList($('list'), ordered.map(o => ({ key: o.svc.name, ...o })),
+      buildCard,
+      (card, { svc, st }) => fillCard(card, svc, st));
+  }
+
+  $('gen').addEventListener('click', () => {
+    const b = new Uint8Array(24);
+    crypto.getRandomValues(b);
+    $('secret').value = Array.from(b, x => x.toString(16).padStart(2, '0')).join('');
+    cfg.webhook_secret = $('secret').value;
+    $('secret').type = 'text';
+    markDirty();
+  });
+
+  $('reveal').addEventListener('click', () => {
+    const s = $('secret');
+    s.type = s.type === 'password' ? 'text' : 'password';
+    $('reveal').textContent = s.type === 'password' ? 'Show' : 'Hide';
+  });
+
+  ['token', 'secret'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      cfg[id === 'token' ? 'github_token' : 'webhook_secret'] = $(id).value;
+      markDirty();
+    });
+  });
+
+  $('watchdog').addEventListener('change', () => {
+    cfg.watchdog_enabled = $('watchdog').checked;
+    markDirty();
+  });
+
+  $('discard').addEventListener('click', () => { cfg = clone(saved); paint(); markDirty(); });
+
+  $('save').addEventListener('click', async () => {
+    const btn = $('save');
+    btn.disabled = true;
+    try {
+      const r = await fetch('/api/config', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(cfg),
+      });
+      if (r.ok) {
+        saved = clone(cfg);
+        markDirty();
+        toast('Saved.');
+        refresh();
+      } else {
+        toast('Save failed: ' + await r.text(), false);
+      }
+    } catch { toast('Could not reach the server', false); }
+    btn.disabled = false;
+  });
+
+  function paint() {
+    $('token').value = cfg.github_token || '';
+    $('secret').value = cfg.webhook_secret || '';
+    $('watchdog').checked = !!cfg.watchdog_enabled;
+    $('tokchip').innerHTML = cfg.github_token
+      ? '<span class="ok-chip">Set</span>'
+      : '<span class="no-chip">Missing</span>';
+    renderSummary();
+    renderServices();
+  }
+
+  async function refresh() {
+    try {
+      status = await fetch('/api/status').then(r => r.json());
+      renderSummary();
+      renderServices();
+    } catch { /* keep last known */ }
+  }
+
+  (async function load() {
+    try {
+      const [c, s] = await Promise.all([
+        fetch('/api/config').then(r => r.json()),
+        fetch('/api/status').then(r => r.json()),
+      ]);
+      cfg = c;
+      cfg.services = cfg.services || [];
+      status = s;
+      saved = clone(cfg);
+      paint();
+    } catch (e) {
+      scaffold($('list'), '<div class="empty">Could not load configuration.</div>');
+    }
+  })();
+
+  // keep status fresh, but never clobber edits in progress
+  setInterval(() => { if (!dirty()) refresh(); }, 15000);
+</script>
+</body>
+</html>

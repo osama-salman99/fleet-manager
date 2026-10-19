@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs><linearGradient id="t" x1=".15" y1="0" x2=".85" y2="1"><stop offset="0" stop-color="#411726"/><stop offset="1" stop-color="#210511"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14" fill="url(#t)"/>
+  <g transform="translate(32 32) scale(.74) translate(-50 -50)" fill="#FF8FC2" color="#FF8FC2"><mask id="sessionfm" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff"/><circle cx="40" cy="36" r="13.5" fill="#000"/><circle cx="60" cy="64" r="13.5" fill="#000"/></mask><path mask="url(#sessionfm)" d="M22 36H78M22 64H78" stroke="currentColor" stroke-width="7.5" stroke-linecap="round" fill="none"/><circle cx="40" cy="36" r="9"/><circle cx="60" cy="64" r="9"/></g>
+</svg>

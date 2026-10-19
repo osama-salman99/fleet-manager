@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e1411" media="(prefers-color-scheme: dark)">
+<title>Claude – Health</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<script src="/spa.js"></script>
+<script src="/dom.js"></script>
+<script src="/nav.js"></script>
+<style>
+  :root {
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2129; --line:#30363d; --line-soft:#21262d;
+    --ink:#e6edf3; --soft:#c9d1d9; --faint:#8b949e;
+    --blue:#58a6ff; --green:#3fb950; --amber:#d29922; --red:#f85149; --pink:#f778ba; --cyan:#39c5cf;
+    --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:22px 18px 60px; max-width:1120px; margin-inline:auto;
+  }
+  a { color:inherit; }
+  .top { display:flex; align-items:center; gap:12px; margin-bottom:4px; }
+  .back {
+    font-size:.8rem; text-decoration:none; color:var(--faint);
+    border:1px solid var(--line); border-radius:7px; padding:4px 10px; white-space:nowrap;
+  }
+  @media (hover: hover) and (pointer: fine) {
+      .back:hover { border-color:var(--faint); color:var(--ink); }
+  }
+  .back:active { border-color:var(--faint); color:var(--ink); transition-duration: 60ms; }
+  h1 { font-size:1.15rem; margin:0; font-weight:650; flex:1; }
+  h1 .dot { color:var(--pink); }
+  .sub { color:var(--faint); font-size:.8rem; margin:2px 0 20px; }
+  h2 { font-size:.72rem; text-transform:uppercase; letter-spacing:.07em; color:var(--faint); font-weight:650; margin:26px 0 11px; }
+
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px 14px; }
+  .kpi .n { font-size:1.5rem; font-weight:680; font-variant-numeric:tabular-nums; }
+  .kpi .l { color:var(--faint); font-size:.76rem; margin-top:2px; }
+  /* The cost is a sum over the replies we still hold, not an all-time figure, so
+     the card carries its own start date — three short words on the card beat a
+     sentence underneath it, which nobody reads. The full window is in the
+     card's tooltip. */
+  .kpi .since { color:var(--faint); opacity:.75; font-size:.7rem; margin-top:3px; }
+
+  /* Recent replies gained two columns (which session, and at what effort), so on
+     a phone the table now scrolls sideways. Source is "main" on nearly every row
+     — hide that one column at phone width so the figures people actually read
+     stay on screen. */
+  @media (max-width:560px) {
+    table.rt tr > *:nth-child(5) { display:none; }
+    table.rt th, table.rt td { padding-left:8px; padding-right:8px; }
+  }
+
+  /* Time per request: these card titles are sentences, not bucket names. On a
+     phone the table keeps when, which session, replies and the total. */
+  .bk.rq .name { text-transform:none; }
+  @media (max-width:560px) {
+    table.rq tr > *:nth-child(3), table.rq tr > *:nth-child(5) { display:none; }
+    table.rq th, table.rq td { padding-left:8px; padding-right:8px; }
+    table.rs tr > *:nth-child(2), table.rs tr > *:nth-child(3) { display:none; }
+    table.rs th, table.rs td { padding-left:8px; padding-right:8px; }
+  }
+
+  .buckets { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px; }
+  .bk { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 15px; }
+  .bk .h { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:9px; }
+  .bk .name { font-weight:680; font-size:.95rem; text-transform:capitalize; }
+  .bk .rng { color:var(--faint); font-size:.72rem; }
+  .bk .big { font-size:2rem; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; }
+  .bk .big small { font-size:.9rem; color:var(--faint); font-weight:600; }
+  .bar { height:7px; background:var(--line-soft); border-radius:4px; overflow:hidden; margin:11px 0 9px; }
+  .bar i { display:block; height:100%; background:var(--blue); border-radius:4px; transition:width .5s ease; }
+  .bk .pp { display:flex; flex-wrap:wrap; gap:8px 15px; color:var(--faint); font-size:.76rem; }
+  .bk .pp b { color:var(--soft); font-variant-numeric:tabular-nums; }
+
+  .windows { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:10px; }
+  .win { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:14px 15px; }
+  .win .h { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; }
+  .win .lab { font-weight:680; font-size:.95rem; }
+  .win .lab small { color:var(--faint); font-weight:600; font-size:.72rem; margin-left:6px; }
+  .win .big { font-size:1.9rem; font-weight:700; font-variant-numeric:tabular-nums; line-height:1; }
+  .win .big small { font-size:.85rem; color:var(--faint); font-weight:600; }
+  .win .brk { display:flex; gap:14px; color:var(--faint); font-size:.76rem; margin-top:11px; flex-wrap:wrap; }
+  .win .brk b { color:var(--soft); font-variant-numeric:tabular-nums; }
+  .win .pbar { height:8px; background:var(--line-soft); border-radius:5px; overflow:hidden; margin:12px 0 7px; }
+  .win .pbar i { display:block; height:100%; border-radius:5px; transition:width .5s ease,background .3s ease; }
+  .win .pbar i.g { background:var(--green); }
+  .win .pbar i.y { background:var(--amber); }
+  .win .pbar i.r { background:var(--red); }
+  .win .spent { display:flex; justify-content:space-between; gap:10px; font-size:.78rem; color:var(--faint); }
+  .win .spent b { color:var(--ink); font-variant-numeric:tabular-nums; }
+  .win .lab { display:inline-flex; align-items:center; }
+  .lpill { font-size:.64rem; text-transform:uppercase; letter-spacing:.05em; padding:2px 8px; border-radius:20px; font-weight:700; white-space:nowrap; }
+  .lpill.ok { background:rgba(63,185,80,.15); color:var(--green); }
+  .lpill.warning { background:rgba(210,153,34,.16); color:var(--amber); }
+  .lpill.rejected { background:rgba(248,81,73,.16); color:var(--red); }
+  .badge { font-size:.6rem; text-transform:uppercase; letter-spacing:.05em; color:var(--faint);
+           border:1px solid var(--line); border-radius:20px; padding:1px 7px; margin-left:7px; font-weight:600; }
+  .note code { font-family:var(--mono); font-size:.9em; background:var(--panel2); padding:1px 4px; border-radius:4px; }
+  .note { color:var(--faint); font-size:.74rem; margin:9px 2px 0; line-height:1.55; }
+
+  table { width:100%; border-collapse:collapse; font-size:.83rem; }
+  .wrap { overflow-x:auto; background:var(--panel); border:1px solid var(--line); border-radius:10px; }
+  th { text-align:left; color:var(--faint); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.04em;
+       padding:9px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  td { padding:8px 12px; border-bottom:1px solid var(--line-soft); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  tr:last-child td { border-bottom:none; }
+  td.model, td.tool { font-family:var(--mono); font-size:.78rem; }
+  .mut { color:var(--faint); }
+  .mbar { position:relative; }
+  .mbar i { position:absolute; left:0; top:0; bottom:0; background:rgba(88,166,255,.14); }
+  .mbar span { position:relative; }
+
+  .empty { background:var(--panel); border:1px dashed var(--line); border-radius:10px; padding:28px; text-align:center; color:var(--faint); }
+  .empty b { color:var(--ink); }
+  .foot { margin-top:30px; color:var(--faint); font-size:.74rem; }
+  @media (prefers-color-scheme:light){
+    :root{ --bg:#f6f8fa; --panel:#fff; --panel2:#f0f3f6; --line:#d0d7de; --line-soft:#eaeef2;
+           --ink:#1f2328; --soft:#424a53; --faint:#656d76; }
+  }
+
+/* Tab pill. Switching tabs runs a view transition (spa.js starts it for its
+   in-place swap; a real page load uses the browser's own) that carries one shared
+   pill from the old tab to the new one, with a little spring and stretch on the
+   way. Only the pill and the three tab labels take part: the page itself is left
+   out (root has no name), so everything else still changes in one paint rather
+   than cross-fading. The pill is its own element behind the links, not the
+   current link's background, so the text never moves or squashes; each label
+   only fades between its plain and selected colour. Browsers without view
+   transitions, and anyone who asks for less motion, just switch. */
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+:root { view-transition-name:none; }
+:root::view-transition { pointer-events:none; }
+header.console .nav { position:relative; }
+.navpill { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none;
+  border-radius:999px; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55);
+  view-transition-name:navpill; }
+.navlink { position:relative; }
+.navlink[href="/"] { view-transition-name:nav-overview; }
+.navlink[href="/claude"] { view-transition-name:nav-claude; }
+.navlink[href="/hetzner"] { view-transition-name:nav-hetzner; }
+.navlink[href="/config"] { view-transition-name:nav-deploy; }
+.navlink[href="/builds"] { view-transition-name:nav-builds; }
+.nav.pilled .navlink.current { color:#fff; background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled .navlink.current:hover { color:#fff; background:transparent; box-shadow:none; }
+}
+/* Dragging the pill (nav.js): while a finger steers it, the labels go plain
+   except the one under the pill, the pill swells a touch and follows the finger
+   directly, then springs onto the tab it is let go over. A hovering mouse
+   steers it the same way, minus the swell. pan-y keeps vertical
+   swipes scrolling the page; only sideways ones move the pill. */
+.nav.pilled .navlink.current:active { color:#fff; background:transparent; box-shadow:none; transition-duration: 60ms; }
+header.console .nav { touch-action:pan-y; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+.nav.pilled.steer .navlink { color:var(--ink-soft); background:transparent; box-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .nav.pilled.steer .navlink:hover { color:var(--ink-soft); background:transparent; box-shadow:none; }
+}
+.nav.pilled.steer .navlink:active { color:var(--ink-soft); background:transparent; box-shadow:none; transition-duration: 60ms; }
+.nav.pilled.steer .navlink.over { color:#fff; }
+.nav.steer .navpill { transition:left .34s cubic-bezier(.3,1.3,.5,1), width .22s ease, scale .2s ease; }
+.nav.dragging .navpill { transition:width .22s ease, scale .2s ease; scale:1.07; }
+@media (prefers-reduced-motion: reduce) { .nav.steer .navpill { transition:none; } }
+::view-transition-group(navpill) { animation-duration:.55s;
+  animation-timing-function:linear(0, 0.062, 0.204, 0.377, 0.548, 0.7, 0.822, 0.913, 0.976, 1.016, 1.037, 1.045, 1.045, 1.04, 1.032, 1.024, 1.017, 1.01, 1.006, 1.002, 1); }
+/* While it moves, the pill is drawn fresh rather than as a stretched picture of
+   the old and new pill, which would warp its round ends and double its edge. */
+::view-transition-old(navpill), ::view-transition-new(navpill) { animation:none; opacity:0; }
+::view-transition-image-pair(navpill) { border-radius:999px; background:var(--green-solid);
+  box-shadow:0 3px 11px -2px rgba(19,185,112,.55); animation:navpill-stretch .55s cubic-bezier(.3,0,.3,1); }
+@keyframes navpill-stretch { 0%,100% { scale:1; } 35% { scale:1.08 .88; } }
+::view-transition-group(nav-overview), ::view-transition-group(nav-claude), ::view-transition-group(nav-deploy), ::view-transition-group(nav-builds) { animation-duration:.25s; }
+</style>
+
+<style>
+/* ============================================================
+   Redesign layer — "instrument panel" console (shared identity)
+   Warm-neutral ink, one aqua signal accent, mono-forward
+   readouts, one header shared across every page. Dark, committed.
+   ============================================================ */
+:root {
+  --bg:#f6f9f7; --bg-2:#f1f5f2;
+  --panel:#ffffff; --panel2:#eef3f0; --panel-2:#eef3f0;
+  --line:#e4e9e5; --line-soft:#eef2ef;
+  --ink:#17211b; --soft:#55635b; --faint:#667469;
+  --blue:#2f6fed; --green:#0f9e58; --amber:#bd7d10; --red:#dc2f36;
+  --pink:#c9459a; --cyan:#0f9e58;
+  --signal:#0f9e58; --signal-bg:rgba(16,179,100,.12);
+  --r:14px;
+}
+body {
+  background:
+    radial-gradient(1200px 320px at 50% -140px, rgba(16,179,100,.05), transparent 70%),
+    var(--bg);
+  padding:0 18px 72px; max-width:1160px;
+}
+
+/* ---- shared console header ---- */
+header.console {
+  position:sticky; top:0; z-index:30;
+  margin:0 calc(50% - 50vw) 22px; padding:12px max(18px, calc(50vw - 560px));
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  background:#ffffff;
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+  border-bottom:1px solid var(--line);
+}
+header.console::after {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background:repeating-linear-gradient(180deg, rgba(255,255,255,.015) 0 1px, transparent 1px 3px);
+  -webkit-mask:linear-gradient(180deg,#000,transparent); mask:linear-gradient(180deg,#000,transparent);
+}
+.wordmark { display:flex; align-items:center; text-decoration:none;
+  font-family:var(--mono); font-size:.98rem; letter-spacing:-.01em; }
+.wordmark span:first-of-type { color:var(--ink); font-weight:600; }
+.wordmark span:last-of-type { color:var(--soft); font-weight:500; }
+.wordmark i { color:var(--signal); font-style:normal; margin:0 1px; text-shadow:none; }
+@media (hover: hover) and (pointer: fine) {
+    .wordmark:hover span:last-of-type { color:var(--ink); }
+}
+header.console .nav { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:auto; }
+.navlink { text-decoration:none; color:var(--soft); font-size:.82rem; font-weight:550;
+  padding:6px 11px; border-radius:8px; border:1px solid transparent; white-space:nowrap;
+  transition:color .15s, background-color .15s, border-color .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink:hover { color:var(--ink); background:var(--panel); }
+}
+.navlink:active { color:var(--ink); background:var(--panel); transition-duration: 60ms; }
+.navlink.current { color:var(--signal); border-color:var(--line); background:var(--panel);
+  box-shadow:inset 0 -2px 0 var(--signal); }
+.navlink:focus-visible { outline:2px solid var(--signal); outline-offset:2px; }
+
+/* ---- page title ---- */
+.pagehead { margin:24px 2px 4px; }
+.pagehead h1 { font-size:1.5rem; font-weight:680; letter-spacing:-.015em; margin:0; }
+.sub { color:var(--faint); font-size:.84rem; margin:5px 0 0; }
+
+/* ---- eyebrows + surfaces ---- */
+h2 { font-family:var(--mono); letter-spacing:.12em; color:var(--faint);
+  display:flex; align-items:center; gap:8px; }
+h2::before { content:""; width:11px; height:2px; background:var(--signal); border-radius:2px;
+  box-shadow:0 0 8px rgba(16,179,100,.55); flex:none; }
+.kpi, .bk, .win, .wrap, .empty { border-radius:var(--r); }
+.kpi, .bk, .win, .panel { box-shadow:0 1px 2px rgba(20,45,32,.05); }
+.kpi .n, .bk .big, .win .big, .kpi .l { font-family:var(--mono); }
+.kpi .n { letter-spacing:-.02em; }
+.kpi .l, .bk .rng { color:var(--faint); }
+
+
+/* window quota bars */
+.win .pbar i.g { background:var(--green); }
+.win .pbar i.y { background:var(--amber); }
+.win .pbar i.r { background:var(--red); }
+.lpill.ok { background:var(--green-bg,rgba(70,198,106,.15)); color:var(--green); }
+.lpill.warning { background:rgba(224,168,58,.16); color:var(--amber); }
+.lpill.rejected { background:rgba(242,86,74,.16); color:var(--red); }
+.badge { border-color:var(--line); color:var(--faint); }
+
+/* tables */
+th { font-family:var(--mono); letter-spacing:.06em; color:var(--faint); }
+.mbar i { background:rgba(16,179,100,.13); }
+.note code { background:var(--panel2); }
+
+.foot { color:var(--faint); font-family:var(--mono); }
+@media (max-width:560px){ header.console .nav { width:100%; margin-left:0; } }
+</style>
+
+<style>
+/* ============================================================
+   Fresh "health app" restyle — friendly light look
+   ============================================================ */
+:root{
+  color-scheme:light;
+  --bg:#f3f7f4; --bg-2:#e9f0ec; --panel:#ffffff; --panel2:#f1f6f2; --panel-2:#f1f6f2;
+  --line:#e6ede8; --line-soft:#eef3f0;
+  --ink:#12241a; --soft:#53625a; --ink-soft:#53625a; --faint:#61706a; --ink-faint:#61706a;
+  --green:#0a8f52; --green-solid:#13b970; --green-bg:#e6f7ee;
+  --amber:#b06a08; --amber-solid:#f5a524; --amber-bg:#fdf1de;
+  --red:#d92d20; --red-solid:#f04438; --red-bg:#fdecea;
+  --blue:#2563eb; --blue-solid:#3b82f6; --blue-bg:#e9f1fe;
+  --pink:#c9459a; --cyan:#0d9488; --signal:#0a8f52;
+  --display:ui-rounded,"SF Pro Rounded","Segoe UI Rounded",system-ui,sans-serif;
+  --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --shadow:0 1px 2px rgba(18,40,28,.05), 0 8px 24px -12px rgba(18,40,28,.14);
+  --r:16px;
+}
+body{ background:
+  radial-gradient(900px 380px at 88% -120px,#e3f3ea,transparent 70%),
+  radial-gradient(760px 320px at 6% -80px,#eaf2fb,transparent 70%),
+  var(--bg); color:var(--ink); font-family:var(--sans); }
+header.console{ background:#ffffff;
+  -webkit-backdrop-filter:none; backdrop-filter:none; border-bottom:1px solid var(--line); }
+header.console::after{ display:none; }
+.wordmark{ display:flex; align-items:center; gap:9px; text-decoration:none; font-family:var(--display); font-size:1.06rem; font-weight:750; letter-spacing:-.01em; color:var(--ink); }
+.wordmark .mk{ width:26px; height:26px; border-radius:9px; flex:none; position:relative; background:linear-gradient(150deg,#1ccb7b,#0f9a5c); box-shadow:0 3px 9px rgba(19,185,112,.42); }
+.wordmark .mk::after{ content:""; position:absolute; inset:0; margin:auto; width:9px; height:9px; border-radius:50%; background:#fff; box-shadow:0 0 0 3px rgba(255,255,255,.4); }
+.wordmark span.dim{ color:var(--faint); font-weight:650; }
+.navlink{ color:var(--ink-soft); font-weight:600; font-size:.85rem; padding:7px 14px; border-radius:999px; border:none; box-shadow:none; transition:color .15s,background-color .15s; }
+@media (hover: hover) and (pointer: fine) {
+    .navlink:hover{ color:var(--ink); background:var(--panel-2); }
+}
+.navlink:active { color:var(--ink); background:var(--panel-2); transition-duration: 60ms; }
+.navlink.current{ color:#fff; background:var(--green-solid); box-shadow:0 3px 11px -2px rgba(19,185,112,.55); }
+.navlink:focus-visible{ outline:2px solid var(--green-solid); outline-offset:2px; }
+.pill{ border:1px solid var(--line); box-shadow:var(--shadow); font-weight:600; }
+.pill.live{ color:var(--green); } .pill.live .lamp{ background:var(--green-solid); box-shadow:0 0 0 3px rgba(19,185,112,.2); }
+.pagehead h1{ font-family:var(--display); font-weight:770; letter-spacing:-.02em; }
+.sub{ color:var(--soft); }
+h2{ font-family:var(--display); font-weight:700; font-size:1.05rem; letter-spacing:-.01em; color:var(--ink); text-transform:none; }
+h2::before{ display:none !important; }
+.kpi,.bk,.win,.wrap,.empty{ border-radius:var(--r); box-shadow:var(--shadow); border-color:var(--line); }
+.kpi .n,.bk .big,.win .big{ font-family:var(--display); }
+.kpi .l,.bk .rng{ color:var(--faint); }
+/* One colour for all three bars. The bar length already encodes the value and the
+   card title carries the identity, so a second encoding would only spend a hue on
+   what is already shown — and the old amber "high" read as a warning when a slow
+   reply is simply a bigger task. Amber and red stay reserved for the quota bars,
+   where they actually mean something. */
+.bk .bar i{ background:var(--green-solid); }
+.win .pbar i.g{ background:var(--green-solid); } .win .pbar i.y{ background:var(--amber-solid); } .win .pbar i.r{ background:var(--red-solid); }
+.lpill.ok{ color:var(--green); background:var(--green-bg); } .lpill.warning{ color:var(--amber); background:var(--amber-bg); } .lpill.rejected{ color:var(--red); background:var(--red-bg); }
+.mbar i{ background:rgba(19,185,112,.13); }
+.bar i{ background:var(--green-solid); }
+.foot{ color:var(--faint); font-family:var(--sans); }
+
+/* Two short tables side by side instead of stacked — they are narrow enough that
+   stacking them wasted the right half of the page and pushed everything down. */
+.duo{ display:grid; grid-template-columns:1fr 1fr; gap:0 22px; align-items:start; }
+.duo > div > h2{ margin-top:26px; }
+@media (max-width:760px){ .duo{ grid-template-columns:1fr; gap:0; } }
+
+/* A row count sits with the heading rather than in a sentence beneath it. */
+h2 .hcount{ font-family:var(--sans); font-size:.72rem; font-weight:600; color:var(--faint);
+  background:var(--panel2); border-radius:999px; padding:2px 9px; margin-left:9px; letter-spacing:0; }
+
+/* The one-line quota note reads as a caption, not a paragraph. */
+.note{ font-size:.75rem; margin-top:10px; }
+.note [title]{ cursor:help; border-bottom:1px dotted #b9c6bf; padding-bottom:1px; }
+/* When the phone is set to dark: the same dashboard at night. Near-black green panels, light
+   ink, and the status colours lifted a shade so they read on dark. The service hues and the
+   charts' series colours are mid-tones that work on both, so they stay. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme:dark;
+    --bg:#0e1411; --bg-2:#131b17; --panel:#161e1a; --panel-2:#1c2621; --panel2:#1c2621;
+    --line:#26312b; --line-soft:#1f2924;
+    --ink:#e4ede7; --ink-soft:#a2b1a8; --soft:#a2b1a8; --ink-faint:#85948b; --faint:#85948b;
+    --green:#3fd08a; --green-bg:rgba(19,185,112,.15);
+    --amber:#f2b04f; --amber-bg:rgba(245,165,36,.15);
+    --red:#ff7a6e; --red-bg:rgba(240,68,56,.15);
+    --blue:#7aa7ff; --blue-bg:rgba(59,130,246,.16);
+    --pink:#e67fc0; --cyan:#3cc4b6; --signal:#3fd08a;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.6);
+    --shadow-lift:0 2px 6px rgba(0,0,0,.35), 0 16px 32px -14px rgba(0,0,0,.7);
+  }
+  body { background:
+      radial-gradient(900px 380px at 88% -120px, rgba(19,185,112,.10), transparent 70%),
+      radial-gradient(760px 320px at 6% -80px, rgba(59,130,246,.08), transparent 70%),
+      var(--bg); }
+  header.console { background:#0e1411; }
+  .note [title] { border-bottom-color:#4a5850; }
+}
+/* Five tabs fit on one line on a phone only with tighter spacing. */
+@media (max-width:560px){ header.console .nav{ flex-wrap:nowrap; gap:0; justify-content:space-between; }
+  .navlink{ padding:7px 7px; } }
+</style>
+</head>
+<body>
+  <header class="console">
+    <a class="wordmark" href="/"><span class="mk"></span>osmosis&nbsp;<span class="dim">health</span></a>
+    <div class="nav">
+      <span class="navpill" aria-hidden="true"></span>
+      <a class="navlink" href="/">Overview</a>
+      <a class="navlink current" href="/claude">Claude</a>
+      <a class="navlink" href="/hetzner">Hetzner</a>
+      <a class="navlink" href="/config">Deploy</a>
+      <a class="navlink" href="/builds">Builds</a>
+    <script>navPill(); // the tab pill — see nav.js</script>
+    </div>
+  </header>
+  <div class="pagehead">
+    <h1>Claude Code telemetry</h1>
+    <div class="sub" id="sub">Duration, tokens and cost for every reply Claude sends. Measured and stored on this VPS.</div>
+  </div>
+
+  <div id="body"></div>
+
+  <div class="foot" id="foot"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const secs = v => v >= 10 ? v.toFixed(1)+'s' : v >= 1 ? v.toFixed(2)+'s' : Math.round(v*1000)+'ms';
+// Cache reads run into the tens of millions, and "85056k" is unreadable — carry
+// the unit up to M so every figure stays at most four characters.
+const tok = v => v >= 1e6 ? (v/1e6).toFixed(v>=1e7?0:1)+'M'
+  : v >= 1000 ? (v/1000).toFixed(v>=10000?0:1)+'k' : Math.round(v);
+// The source is the same string on almost every row; trim it to the part
+// that actually differs so the column stops reading as a wall of repetition.
+const shortSrc = s => (s||'').replace(/^repl_/,'').replace(/_thread$/,'').replace(/^prompt_/,'');
+// Sessions go by a name ("Health", "Sessions", "VPS"), which reads far better
+// than an id. We only have one for sessions the controller still lists, so fall
+// back to the first block of the id; the full id is in the row's tooltip either
+// way.
+const sessionLabel = t => t.session_name || (t.session||'').split('-')[0].slice(0, 8) || '—';
+// Reasoning effort is only sent when the session has one set.
+const effortOf = t => t.effort || '—';
+// A whole request runs into minutes, where "754.0s" means nothing at a glance.
+const span = v => v < 60 ? secs(v) : v < 3600 ? Math.floor(v/60)+'m '+String(Math.round(v%60)).padStart(2,'0')+'s'
+  : Math.floor(v/3600)+'h '+String(Math.floor(v%3600/60)).padStart(2,'0')+'m';
+const usd = v => v >= 1 ? '$'+v.toFixed(2) : '$'+v.toFixed(v>=0.01?3:4);
+const ago = ts => { const s=Math.max(0,Date.now()/1000-ts); if(s<90)return Math.round(s)+'s ago';
+  if(s<5400)return Math.round(s/60)+'m ago'; return Math.round(s/3600)+'h ago'; };
+// A date and time a person can read — "24 Aug, 09:14". Pinned to day-then-month
+// on a 24-hour clock so it reads the same whatever the device's locale is.
+const stamp = ts => new Date(ts*1000)
+  .toLocaleString('en-GB', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+// How long ago that was, in the biggest unit that still reads naturally.
+const spanSince = ts => { const s = Math.max(0, Date.now()/1000 - ts);
+  if (s >= 129600) return Math.round(s/86400) + ' days';
+  if (s >= 5400) return Math.round(s/3600) + ' hours';
+  return Math.max(1, Math.round(s/60)) + ' minutes'; };
+const shortModel = m => (m||'').replace(/^claude-/,'').replace(/-\d{8}$/,'');
+
+function render(d) {
+  // Just the timestamp: watching the clock tick tells you the cadence better
+  // than naming it does.
+  $('foot').textContent = 'Updated ' + new Date((d.updated||0)*1000).toLocaleTimeString();
+
+  if (!d.enabled) {
+    scaffold($('body'), `<div class="empty">No replies recorded yet.<br>
+      <b>Open a new Claude Code session</b> — it appears here within a minute.</div>`);
+    return;
+  }
+
+  /* Everything below this line is the same shape on every refresh — the same
+     headings, the same table headers, the same empty cells. It is built once and
+     then only filled in, so a five-second refresh no longer drops the text you
+     were reading, snaps a scrolled table back to the left, or restarts the bar
+     animations from zero. */
+  scaffold($('body'), SKELETON);
+
+  setText($('k-turns'), String(d.turns));
+  setText($('k-sessions'), String(d.sessions));
+  setText($('k-out'), tok(d.total_out_tokens));
+  setText($('k-cost'), usd(d.total_cost));
+
+  // None of those four is an all-time figure: they add up the replies still in
+  // memory (the newest 2,000). The cost is the one that reads as a lifetime
+  // total, so it carries the start date on the card itself.
+  if (d.since_ts) {
+    const from = stamp(d.since_ts);
+    setText($('k-since'), 'since ' + from.replace(/,.*/, ''));
+    setAttr($('k-cost-card'), 'title',
+      `The ${d.turns.toLocaleString()} replies still held, back to ${from} — older ones `
+      + `stay in the archive.`);
+  } else {
+    setText($('k-since'), '');
+  }
+
+  const winLabel = {'5h':'5-hour limit','7d':'weekly limit'};
+  const L = d.limits || {};
+  const limOf = {'5h': L.five_h, '7d': L.seven_d};
+  const claimOf = {'5h':'five_hour', '7d':'seven_day'};
+  const stMap = {allowed:['ok','allowed'], allowed_warning:['warning','warning'], rejected:['rejected','over limit']};
+  const until = ts => { let s=(ts||0)-Date.now()/1000; if(s<=0)return 'now';
+    const h=Math.floor(s/3600), m=Math.floor((s%3600)/60); return h?`${h}h ${m}m`:`${m}m`; };
+
+  /* The percentage left and the reset countdown move on every refresh while the
+     rest of a window card does not, so each card keeps its elements and only
+     those two figures get rewritten. It is also what lets the usage bar animate:
+     a bar that is rebuilt starts at its new width and slides nowhere. */
+  syncList($('windows'), (d.windows||[]).map(w => ({ key: w.label, w })),
+    () => {
+      const el = h('div', 'win');
+      const head = h('div', 'h');
+      const lab = h('span', 'lab');
+      lab.append(document.createTextNode(''), h('span', 'badge'));
+      head.append(lab, h('span', 'lpill'));
+      const big = h('div', 'big');
+      big.append(document.createTextNode(''), h('small'));
+      const pbar = h('div', 'pbar');
+      pbar.appendChild(h('i'));
+      const spent = h('div', 'spent');
+      const usedTxt = h('span'); usedTxt.append(h('b'), document.createTextNode(' used'));
+      spent.append(usedTxt, h('span'));
+      const err = h('div', 'note');
+      err.style.margin = '7px 0 2px';
+      const brk = h('div', 'brk');
+      for (let i = 0; i < 5; i++) {
+        const s = h('span');
+        s.append(document.createTextNode(''), h('b'));
+        brk.appendChild(s);
+      }
+      el.append(head, big, pbar, spent, err, brk);
+      return el;
+    },
+    (el, { key, w }) => {
+      const lim = limOf[key] || {};
+      const has = L.fetched > 0 && lim.utilization !== undefined;
+      const used = has ? lim.utilization*100 : 0;
+      const st = stMap[lim.status] || ['ok', lim.status||''];
+      const [head, big, pbar, spent, err, brk] = el.children;
+      const [lab, pill] = head.children;
+
+      lab.firstChild.nodeValue = winLabel[key] || key;
+      setHidden(lab.children[0], !(has && L.representative === claimOf[key]));
+      setText(lab.children[0], 'binding');
+      setHidden(pill, !(has && lim.status));
+      setClass(pill, 'lpill ' + st[0]);
+      setText(pill, st[1]);
+
+      // Without a quota reading there is nothing to draw a bar from, so the card
+      // says so in place of the number rather than showing a confident 100%.
+      setClass(big, has ? 'big' : 'big mut');
+      setStyle(big, 'fontSize', has ? '' : '1.15rem');
+      big.firstChild.nodeValue = has ? (100-used).toFixed(0)+'%' : 'quota unavailable';
+      setText(big.children[0], has ? ' left' : '');
+      // Hidden through display, not the hidden attribute: .spent sets display:flex
+      // in the stylesheet, and an author rule beats the browser's own [hidden].
+      setStyle(pbar, 'display', has ? '' : 'none');
+      setStyle(spent, 'display', has ? '' : 'none');
+      setStyle(err, 'display', has ? 'none' : '');
+      if (has) {
+        setClass(pbar.firstChild, used >= 85 ? 'r' : used >= 60 ? 'y' : 'g');
+        setStyle(pbar.firstChild, 'width', used.toFixed(1)+'%');
+        setText(spent.children[0].firstChild, used.toFixed(0)+'%');
+        setText(spent.children[1], 'resets in ' + until(lim.reset));
+      } else {
+        setText(err, L.err || 'probe pending…');
+      }
+
+      const cells = [[w.turns+' replies', null], ['in ', tok(w.in_tokens)], ['out ', tok(w.out_tokens)],
+                     ['cache ', tok(w.cache_read)], ['cost ', usd(w.cost)]];
+      cells.forEach(([txt, bold], i) => {
+        const s = brk.children[i];
+        if (s.firstChild.nodeValue !== txt) s.firstChild.nodeValue = txt;
+        setText(s.children[0], bold || '');
+      });
+    });
+
+
+  // The full explanation lives in the hover title — on screen it earns one line.
+  const limWhy = 'Checked every minute — the same figures Claude Code\'s /usage shows.';
+  const noteEl = $('limnote').firstElementChild;
+  const [noteTxt, noteBad] = noteEl.children;
+  setAttr(noteEl, 'title', limWhy);
+  setText(noteTxt, L.fetched > 0
+    ? `Live quota · checked ${ago(L.fetched)}` + (L.ok ? '' : ' · ')
+    : 'Probing account quota…');
+  setHidden(noteBad, !(L.fetched > 0) || !!L.ok);
+  setText(noteBad, 'stale, last probe failed');
+
+  const maxAvg = Math.max(0.001, ...d.buckets.map(b => b.avg_sec));
+  syncList($('buckets'), d.buckets.map(b => ({ key: b.name, b })),
+    () => {
+      const el = h('div', 'bk');
+      const head = h('div', 'h');
+      head.append(h('span', 'name'), h('span', 'rng'));
+      const big = h('div', 'big');
+      big.append(document.createTextNode(''), h('small'));
+      setText(big.children[0], ' avg');
+      const bar = h('div', 'bar');
+      bar.appendChild(h('i'));
+      const pp = h('div', 'pp');
+      for (let i = 0; i < 4; i++) {
+        const s = h('span');
+        s.append(document.createTextNode(''), h('b'));
+        pp.appendChild(s);
+      }
+      el.append(head, big, bar, pp);
+      return el;
+    },
+    (el, { b }) => {
+      const [head, big, bar, pp] = el.children;
+      setClass(el, 'bk ' + b.name);
+      setText(head.children[0], b.name);
+      setText(head.children[1], b.range);
+      big.firstChild.nodeValue = b.count ? secs(b.avg_sec) : '—';
+      setStyle(bar.firstChild, 'width', (b.count ? Math.max(3, 100*b.avg_sec/maxAvg) : 0) + '%');
+      const cells = [['p50 ', b.count?secs(b.p50_sec):'—'], ['p95 ', b.count?secs(b.p95_sec):'—'],
+                     ['tok/s ', b.count?String(Math.round(b.tok_per_sec)):'—'], ['n ', String(b.count)]];
+      cells.forEach(([txt, bold], i) => {
+        const s = pp.children[i];
+        if (s.firstChild.nodeValue !== txt) s.firstChild.nodeValue = txt;
+        setText(s.children[0], bold);
+      });
+    });
+
+  // The two small tables and the recent-replies list are all "a bar in the first
+  // cell, plain figures after it", so one row builder covers all three.
+  const row = (bar, n) => () => {
+    const tr = h('tr');
+    if (bar) { const td = h('td'); td.append(h('i'), h('span')); tr.appendChild(td); }
+    for (let i = bar ? 1 : 0; i < n; i++) tr.appendChild(h('td'));
+    return tr;
+  };
+  const fillBar = (tr, cls, width, label) => {
+    const td = tr.children[0];
+    setClass(td, cls + ' mbar');
+    setStyle(td.children[0], 'width', width + '%');
+    setText(td.children[1], label);
+  };
+  const fillCells = (tr, from, vals) => vals.forEach((v, i) => {
+    setClass(tr.children[from + i], v[1] || '');
+    setText(tr.children[from + i], v[0]);
+  });
+
+  const maxModel = Math.max(1, ...d.by_model.map(m => m.count));
+  syncList($('models'), d.by_model.map(m => ({ key: m.model, m })), row(true, 4),
+    (tr, { m }) => {
+      fillBar(tr, 'model', 100*m.count/maxModel, shortModel(m.model));
+      fillCells(tr, 1, [[String(m.count)], [secs(m.avg_sec)], [usd(m.cost), 'mut']]);
+    });
+
+  const toolList = d.tools || [];
+  const maxTool = Math.max(1, ...toolList.map(t => t.count));
+  syncList($('tools'),
+    toolList.length ? toolList.map(t => ({ key: t.tool || '?', t })) : [{ key: '__empty' }],
+    (it) => {
+      if (it.key === '__empty') {
+        const tr = h('tr'); const td = h('td', 'mut');
+        td.colSpan = 3; td.textContent = 'no tool events yet';
+        tr.appendChild(td); return tr;
+      }
+      return row(true, 3)();
+    },
+    (tr, { t }) => {
+      if (!t) return;
+      fillBar(tr, 'tool', 100*t.count/maxTool, t.tool || '?');
+      fillCells(tr, 1, [[String(t.count)], [secs(t.avg_sec)]]);
+    });
+
+  // 25 near-identical rows buried the rest of the page; the last 10 tell the same
+  // story in a third of the height.
+  const RECENT_ROWS = 10;
+  const recentAll = d.recent || [];
+  // Keyed by the reply itself, not by row number: a new one arriving at the top
+  // then pushes the others down instead of renumbering — and rewriting — all ten.
+  const seen = new Set();
+  const recentItems = recentAll.slice(0, RECENT_ROWS).map(t => {
+    let key = `${t.ts}|${t.session}|${t.source}|${t.out_tokens}`;
+    while (seen.has(key)) key += '·';
+    seen.add(key);
+    return { key, t };
+  });
+  syncList($('recent'), recentItems, row(false, 8), (tr, { t }) => {
+    fillCells(tr, 0, [[ago(t.ts), 'mut'], [sessionLabel(t), t.session_name ? '' : 'model'],
+                      [shortModel(t.model), 'model'], [effortOf(t), 'mut'], [shortSrc(t.source), 'mut'],
+                      [tok(t.out_tokens)], [secs(t.dur_sec)], [usd(t.cost_usd), 'mut']]);
+    // The full session id is too long for a column but worth having on hover.
+    setAttr(tr, 'title', t.session ? 'Session ' + t.session : '');
+  });
+  setText($('recent-count'), 'last ' + Math.min(RECENT_ROWS, recentAll.length));
+
+  // Time per request: the whole wait for one message, tools and all.
+  const R = d.requests || { count: 0, recent: [] };
+  // A median of two or three requests is one long task talking, so the cards
+  // wait for a fair sample; the table below lists each request as it lands.
+  const MIN_REQUESTS = 10;
+  const has = R.count >= MIN_REQUESTS;
+  setText($('rq-p50'), has ? span(R.p50_sec) : '—');
+  setText($('rq-p95'), has ? span(R.p95_sec) : '—');
+  setText($('rq-n'), String(R.count));
+  setText($('rq-calls'), has ? String(Math.round(R.p50_calls)) : '—');
+  setText($('rq-calls95'), has ? String(Math.round(R.p95_calls)) : '—');
+  setText($('rq-write'), has ? Math.round(100*R.writing_share)+'%' : '—');
+  setStyle($('rq-wbar'), 'width', (has ? 100*R.writing_share : 0).toFixed(1)+'%');
+  setText($('rq-rest'), has ? Math.round(100*(1-R.writing_share))+'%' : '—');
+  setStyle($('rq-cards'), 'display', has ? '' : 'none');
+  setStyle($('rq-empty'), 'display', has ? 'none' : '');
+  setText($('rq-empty'), R.count
+    ? `Collecting — ${R.count} of ${MIN_REQUESTS} requests so far; the summary appears at ${MIN_REQUESTS}.`
+    : 'Counting since 4 Oct — a request shows up here five minutes after it finishes.');
+  setStyle($('rq-table'), 'display', R.count ? '' : 'none');
+  syncList($('requests'),
+    (R.recent || []).map(q => ({ key: q.ts + '|' + q.session, q })), row(false, 6),
+    (tr, { q }) => {
+      fillCells(tr, 0, [[ago(q.ts), 'mut'], [sessionLabel(q), q.session_name ? '' : 'model'],
+                        [effortOf(q), 'mut'], [String(q.calls)], [span(q.writing_sec), 'mut'], [span(q.dur_sec)]]);
+      setAttr(tr, 'title', q.session ? 'Session ' + q.session : '');
+    });
+  // Each session's requests added up: the bar is its share of the slowest
+  // session's total, so where the waiting goes is visible at a glance.
+  const BS = R.by_session || [];
+  const maxTotal = Math.max(1, ...BS.map(x => x.total_sec));
+  setStyle($('rq-sessions'), 'display', BS.length ? '' : 'none');
+  syncList($('rq-by-session'), BS.map(x => ({ key: x.session, x })), row(true, 6),
+    (tr, { x }) => {
+      fillBar(tr, x.session_name ? '' : 'model', 100*x.total_sec/maxTotal, sessionLabel(x));
+      fillCells(tr, 1, [[String(x.requests)], [span(x.longest_sec), 'mut'], [span(x.writing_sec), 'mut'],
+                        [x.total_sec - x.writing_sec < 1 ? '—' : span(x.total_sec - x.writing_sec)], [span(x.total_sec)]]);
+      setAttr(tr, 'title', x.session ? 'Session ' + x.session : '');
+    });
+}
+
+
+const SKELETON = `
+  <div class="kpis">
+    <div class="kpi"><div class="n" id="k-turns"></div><div class="l">replies observed</div></div>
+    <div class="kpi"><div class="n" id="k-sessions"></div><div class="l">sessions seen</div></div>
+    <div class="kpi"><div class="n" id="k-out"></div><div class="l">output tokens</div></div>
+    <div class="kpi" id="k-cost-card"><div class="n" id="k-cost"></div><div class="l">total cost</div>
+      <div class="since" id="k-since"></div></div>
+  </div>
+
+  <h2>Usage limits</h2>
+  <div class="windows" id="windows"></div>
+  <div class="note" id="limnote"><span><span class="ltxt"></span><b></b></span></div>
+
+  <h2 title="Grouped by output size — bigger tasks take longer.">Speed by output size</h2>
+  <div class="buckets" id="buckets"></div>
+
+  <h2 title="From the start of a request's first reply to the end of its last, tools included.">Time per request</h2>
+  <div class="buckets" id="rq-cards">
+    <div class="bk rq"><div class="h"><span class="name">Typical request</span><span class="rng">median</span></div>
+      <div class="big" id="rq-p50"></div>
+      <div class="pp" style="margin-top:11px"><span>p95 <b id="rq-p95"></b></span><span>n <b id="rq-n"></b></span></div></div>
+    <div class="bk rq"><div class="h"><span class="name">Replies per request</span><span class="rng">median</span></div>
+      <div class="big" id="rq-calls"></div>
+      <div class="pp" style="margin-top:11px"><span>p95 <b id="rq-calls95"></b></span></div></div>
+    <div class="bk rq"><div class="h"><span class="name">Claude writing</span><span class="rng">share of the time</span></div>
+      <div class="big" id="rq-write"></div>
+      <div class="bar"><i id="rq-wbar"></i></div>
+      <div class="pp"><span title="Running tools, subagents, and the gaps between replies.">tools &amp; waiting <b id="rq-rest"></b></span></div></div>
+  </div>
+  <div class="note" id="rq-empty">Counting since 4 Oct — a request shows up here five minutes after it finishes.</div>
+  <div class="wrap" id="rq-table" style="margin-top:10px"><table class="rq">
+    <thead><tr><th>Finished</th><th>Session</th><th>Effort</th><th>Replies</th><th title="Time Claude spent writing replies in the main conversation.">Writing</th><th>Total</th></tr></thead>
+    <tbody id="requests"></tbody></table></div>
+  <div id="rq-sessions">
+  <h2 title="Each session's finished requests added up — writing versus waiting on tools.">Time by session</h2>
+  <div class="wrap"><table class="rs">
+    <thead><tr><th>Session</th><th>Requests</th><th title="The single longest request.">Longest</th><th title="Time Claude spent writing replies in the main conversation.">Writing</th><th title="Running tools, subagents, and the gaps between replies.">Waiting</th><th>Total</th></tr></thead>
+    <tbody id="rq-by-session"></tbody></table></div>
+  </div>
+
+  <div class="duo">
+    <div>
+      <h2>By model</h2>
+      <div class="wrap"><table>
+        <thead><tr><th>Model</th><th>Replies</th><th>Avg</th><th>Cost</th></tr></thead>
+        <tbody id="models"></tbody></table></div>
+    </div>
+    <div>
+      <h2>Tools</h2>
+      <div class="wrap"><table>
+        <thead><tr><th>Tool</th><th>Calls</th><th>Avg</th></tr></thead>
+        <tbody id="tools"></tbody></table></div>
+    </div>
+  </div>
+
+  <h2>Recent replies<span class="hcount" id="recent-count"></span></h2>
+  <div class="wrap"><table class="rt">
+    <thead><tr><th>When</th><th title="The session's name — hover a row for its full id.">Session</th><th>Model</th><th title="Reasoning effort — blank for older replies.">Effort</th><th>Source</th><th>Out</th><th>Duration</th><th>Cost</th></tr></thead>
+    <tbody id="recent"></tbody></table></div>`;
+
+async function tick() {
+  try {
+    const r = await fetch('/api/claude', { cache:'no-store' });
+    if (r.ok) render(await r.json());
+  } catch (_) {}
+}
+tick();
+setInterval(tick, 5000);
+</script>
+</body>
+</html>

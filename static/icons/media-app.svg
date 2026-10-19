@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs><linearGradient id="t" x1=".15" y1="0" x2=".85" y2="1"><stop offset="0" stop-color="#1e1d41"/><stop offset="1" stop-color="#0a0822"/></linearGradient></defs>
+  <rect width="64" height="64" rx="14" fill="url(#t)"/>
+  <g transform="translate(32 32) scale(.74) translate(-50 -50)" fill="#B9BAFF" color="#B9BAFF"><mask id="mediafm" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff"/><rect x="29" y="35" width="53" height="44" rx="9" fill="#000" stroke="#000" stroke-width="9"/></mask><mask id="mediafn" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100"><rect width="100" height="100" fill="#fff"/><path d="M36 71L48.5 56L56.5 64.5L63.5 57.5L75 71Z" fill="#000" stroke="#000" stroke-width="2.5" stroke-linejoin="round"/><circle cx="44.5" cy="47.5" r="5" fill="#000"/></mask><rect x="19" y="18" width="50" height="41" rx="8" transform="rotate(-10 44 38)" mask="url(#mediafm)"/><rect x="29" y="35" width="53" height="44" rx="9" mask="url(#mediafn)"/></g>
+</svg>
